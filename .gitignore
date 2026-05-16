@@ -10,7 +10,8 @@ legacy/chisel/out
 legacy/generated
 *.qws
 *.qdf
-mill.*
+/mill.*
+/legacy/chisel/mill.*
 build_id.v
 c5_pin_model_dump.txt
 db

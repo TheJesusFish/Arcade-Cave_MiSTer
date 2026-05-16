@@ -20,7 +20,7 @@ The next hand-maintained helper pass converted small, self-contained generated m
 
 The framebuffer helper pass converted `PageFlipper.sv`, `PageFlipper_1.sv`, `RequestQueue.sv`, and `RequestQueue_1.sv` while preserving their generated module ports. `RegisterFile_1.sv` was also adjusted back to explicit registers so Quartus should not spend an M10K RAM block on the tiny sprite/video register files.
 
-Timing reports now include an extra TimeQuest report script at `scripts/timequest_reports.tcl`. It writes detailed setup, hold, and recovery path reports under `output_files/timing_paths/` during Quartus builds. This was added after the framebuffer helper pass restored RAM usage but introduced a small hold violation on the main core clock.
+An earlier cleanup pass temporarily added a custom TimeQuest report hook at `scripts/timequest_reports.tcl` to write detailed setup, hold, and recovery path reports under `output_files/timing_paths/`. That hook has been removed so the Quartus project follows the normal MiSTer core layout and does not require an extra `scripts/` folder during builds.
 
 The detailed hold report showed the hold miss is not inside the converted helpers. The failing path is from `Main:main|CPU:cpu|fx68k:cpu|excUnit:excUnit|aob[5]` on the 32 MHz clock into `MemSys:memSys|ReadCache:progRomCache|requestReg_addr_index[2]` on the 96 MHz clock. Treat this as a core CPU-to-ROM-cache timing boundary to investigate separately, rather than a reason to revert the page/request helper conversion.
 
@@ -86,7 +86,7 @@ The main board pass converted `rtl/cave/Main.sv` into the hand-maintained Cave H
 
 The main board conversion build exact-matched the current sprite-processor smoke-good RBF (`00760f4c57d81a1f13143bc6c021f5562ad82755ef173b0ce84e47528efd2151`), so no additional smoke test was needed.
 
-The repository cleanup pass removed accidental Finder-style `* 2*` duplicate files/directories, merged split legacy Chisel arcadia tests back into `legacy/chisel/arcadia/test/src/`, removed stale `.DS_Store`/temporary files, and left the old `quartus/` project folder retired. The active layout is now root Quartus project files plus `rtl/`, `sys/`, `mra/`, `releases/`, `scripts/`, `doc/`, and `legacy/chisel/`.
+The repository cleanup pass removed accidental Finder-style `* 2*` duplicate files/directories, merged split legacy Chisel arcadia tests back into `legacy/chisel/arcadia/test/src/`, removed stale `.DS_Store`/temporary files, and left the old `quartus/` project folder retired. The active layout is now root Quartus project files plus `rtl/`, `sys/`, `mra/`, `releases/`, `doc/`, and `legacy/chisel/`.
 
 The sprite framebuffer pass rewrote `rtl/cave/SpriteFrameBuffer.sv` as hand-maintained SystemVerilog while preserving the generated ports. It keeps the original line-buffer RAM, hblank-triggered read DMA, swap-triggered clear DMA, write request queue, page flipper, and three-port DDR arbiter wiring, but names the page and DDR address paths.
 
