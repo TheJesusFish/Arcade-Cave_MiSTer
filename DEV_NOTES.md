@@ -22,6 +22,8 @@ The framebuffer helper pass converted `PageFlipper.sv`, `PageFlipper_1.sv`, `Req
 
 An earlier cleanup pass temporarily added a custom TimeQuest report hook at `scripts/timequest_reports.tcl` to write detailed setup, hold, and recovery path reports under `output_files/timing_paths/`. That hook has been removed so the Quartus project follows the normal MiSTer core layout and does not require an extra `scripts/` folder during builds.
 
+The system framework update replaced `sys/` wholesale from `Template_MiSTer/sys/`. `Arcade-Cave.sv` now uses the template `sys/emu_ports.vh` module port include, so the core follows the current 46-bit `HPS_BUS` contract and exposes the framework HDMI control ports (`HDMI_FREEZE`, `HDMI_BLACKOUT`, and `HDMI_BOB_DEINT`) through the standard template interface. Keep future `sys/` updates as whole-folder drops; core-specific hookups belong outside `sys/`.
+
 The detailed hold report showed the hold miss is not inside the converted helpers. The failing path is from `Main:main|CPU:cpu|fx68k:cpu|excUnit:excUnit|aob[5]` on the 32 MHz clock into `MemSys:memSys|ReadCache:progRomCache|requestReg_addr_index[2]` on the 96 MHz clock. Treat this as a core CPU-to-ROM-cache timing boundary to investigate separately, rather than a reason to revert the page/request helper conversion.
 
 The first safe consolidation pass added `rtl/cave/CaveSyncReadMem.sv` and rewired the small Chisel memory wrapper modules (`cacheEntryMem_*`, `channelStateMem_*`, `ram_32x64`, and `ram_64x64`) as compatibility shells around it. This preserves external module names while removing duplicated generated memory bodies.
@@ -48,7 +50,7 @@ The sound wrapper pass added `rtl/cave/CaveClockEnable.sv` and `rtl/cave/CaveOKI
 
 The OKI banking pass rewrote `rtl/cave/NMK112.sv` as hand-maintained SystemVerilog while preserving the generated module ports. The first OKI chip keeps phrase table banking disabled, while the second chip still bank-switches phrase-table addresses below `0x400`.
 
-The current smoke-good soak build is the sprite processor conversion build. Its fresh `output_files/Arcade-Cave.rbf` SHA-256 is `00760f4c57d81a1f13143bc6c021f5562ad82755ef173b0ce84e47528efd2151`.
+The current smoke-good build is the template-framework swap build. Its fresh `output_files/Cave_20260418.rbf` SHA-256 is `ac868819e24054e71ef7f27a23934bbc70f9201177275f115e6dee6452c9042d`. This build completed successfully on 2026-05-16 with the template `sys/` folder, resource use at 19,845 / 41,910 ALMs (47%), 2,754,728 / 5,662,720 block memory bits (49%), 425 / 553 RAM blocks (77%), 51 / 112 DSP blocks (46%), and 4 / 6 PLLs (67%). TimeQuest still reports the known core-clock timing violations (`-1.779 ns` setup on the 32 MHz core clock, `-0.496 ns` hold on the 96 MHz core clock, and `-0.420 ns` recovery on the 32 MHz core clock), but the RBF passed hardware smoke testing.
 
 Build validation rule: when a new build does not byte-match the current smoke-good RBF, inspect the timing/resource reports and take one source-level pass to see whether the changed RTL can be made cleaner or closer to the old synthesis shape before asking for a smoke test. If the RBF byte-matches the smoke-good reference, no smoke test is needed unless there is another concrete concern.
 
@@ -120,7 +122,7 @@ External HDL blocks currently kept under `rtl/` include:
 
 Next modernization targets:
 
-- Decide whether to replace `sys/` wholesale with the current template framework.
+- Keep `sys/` byte-matched with the selected template framework unless intentionally updating it wholesale again.
 - Continue extracting game-specific configuration and board profile data out of large `rtl/cave/*.sv` integration files into hand-maintained HDL/package data.
 - Add a debug grid layer for CPU bus, ROM loader, sound, tile, sprite, and interrupt state.
 - Create a clear board-profile structure before adding harder games such as Pretty Soldier Sailor Moon.
