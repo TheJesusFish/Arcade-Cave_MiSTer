@@ -347,6 +347,7 @@ module Cave(
   wire         gameConfig_sprite_zoom;
   wire         rotateClockwise;
   wire         gameIsMazinger;
+  wire         gameIsAirGallet;
 
   CaveGameConfig gameConfig (
     .game_index           (gameIndexReg),
@@ -381,6 +382,7 @@ module Cave(
     .game_is_gaia                (),
     .game_is_hotdogstorm         (),
     .game_is_mazinger            (gameIsMazinger),
+    .game_is_airgallet           (gameIsAirGallet),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (rotateClockwise),
     .sound_is_ymz280b            (),
@@ -940,6 +942,8 @@ module Cave(
     .io_gameConfig_layer_0_paletteBank   (gameConfig_layer_0_paletteBank),
     .io_gameConfig_layer_1_paletteBank   (_gpu_io_gameConfig_layer_1_paletteBank),
     .io_gameConfig_layer_2_paletteBank   (gameConfig_layer_2_paletteBank),
+    .io_gameConfig_maskLeftColumn        (gameIsAirGallet),
+    .io_gameConfig_airLayer2Direct6bpp   (gameIsAirGallet),
     .io_options_rotate                   (effectiveRotate),
     .io_options_rotateClockwise          (rotateClockwise),
     .io_options_flipVideo                (options_flipVideo),

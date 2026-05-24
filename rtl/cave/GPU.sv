@@ -83,6 +83,8 @@ module GPU(
   input  [1:0]   io_gameConfig_layer_0_paletteBank,
   input  [1:0]   io_gameConfig_layer_1_paletteBank,
   input  [1:0]   io_gameConfig_layer_2_paletteBank,
+  input          io_gameConfig_maskLeftColumn,
+  input          io_gameConfig_airLayer2Direct6bpp,
   input          io_options_rotate,
   input          io_options_rotateClockwise,
   input          io_options_flipVideo,
@@ -138,6 +140,10 @@ module GPU(
     paletteColor[9:5],
     paletteColor[9:7]
   };
+  wire visiblePixel = ~(io_gameConfig_maskLeftColumn & (io_video_pos_x == 9'd0));
+  wire [23:0] maskedVideoRgb888 = visiblePixel ? videoRgb888 : 24'h000000;
+  wire [23:0] maskedFramebufferRgb888 =
+    visiblePixel ? framebufferRgb888 : 24'h000000;
 
   wire [8:0] flippedVideoX = io_video_regs_size_x - io_video_pos_x - 9'h001;
   wire [8:0] flippedVideoY = io_video_regs_size_y - io_video_pos_y - 9'h001;
@@ -170,7 +176,7 @@ module GPU(
   always @(posedge io_videoClock) begin
     systemFramebufferWrReg <= activeDisplayPixel;
     systemFramebufferAddrReg <= nextSystemFramebufferAddr;
-    systemFramebufferDinReg <= {8'h00, framebufferRgb888};
+    systemFramebufferDinReg <= {8'h00, maskedFramebufferRgb888};
   end
 
   SpriteProcessor spriteProcessor (
@@ -235,6 +241,7 @@ module GPU(
     .io_video_regs_size_y         (io_video_regs_size_y),
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
+    .io_direct6bppPixels          (1'b0),
     .io_pen_priority              (layer0PenPriority),
     .io_pen_palette               (layer0PenPalette),
     .io_pen_color                 (layer0PenColor)
@@ -272,6 +279,7 @@ module GPU(
     .io_video_regs_size_y         (io_video_regs_size_y),
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
+    .io_direct6bppPixels          (1'b0),
     .io_pen_priority              (layer1PenPriority),
     .io_pen_palette               (layer1PenPalette),
     .io_pen_color                 (layer1PenColor)
@@ -309,6 +317,7 @@ module GPU(
     .io_video_regs_size_y         (io_video_regs_size_y),
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
+    .io_direct6bppPixels          (io_gameConfig_airLayer2Direct6bpp),
     .io_pen_priority              (layer2PenPriority),
     .io_pen_palette               (layer2PenPalette),
     .io_pen_color                 (layer2PenColor)
@@ -344,7 +353,7 @@ module GPU(
   assign io_systemFrameBuffer_wr = systemFramebufferWrReg;
   assign io_systemFrameBuffer_addr = systemFramebufferAddrReg[16:0];
   assign io_systemFrameBuffer_din = systemFramebufferDinReg;
-  assign io_rgb = videoRgb888;
+  assign io_rgb = maskedVideoRgb888;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   assign io_debug_video = spriteDebug;
 `else

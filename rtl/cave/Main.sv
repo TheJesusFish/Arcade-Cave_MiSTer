@@ -127,6 +127,7 @@ module Main(
   wire        gameIsGaia;
   wire        gameIsHotdogStorm;
   wire        gameIsMazinger;
+  wire        gameIsAirGallet;
 
   CaveBoardProfile boardProfile(
     .game_index                  (io_gameIndex),
@@ -140,6 +141,7 @@ module Main(
     .game_is_gaia                (gameIsGaia),
     .game_is_hotdogstorm         (gameIsHotdogStorm),
     .game_is_mazinger            (gameIsMazinger),
+    .game_is_airgallet           (gameIsAirGallet),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (),
@@ -458,6 +460,120 @@ module Main(
   wire        mazingerBootWatchdogResetActive;
   wire        mazingerBootMarkerWrite;
   wire        mazingerBootWatchdogTrip;
+  wire [23:0] airGalletCpuByteAddr;
+  wire        airGalletProgRomSelect;
+  wire        airGalletMainRamSelect;
+  wire        airGalletSpriteRamSelect;
+  wire        airGalletSoundFlagsRead;
+  wire        airGalletSoundRead;
+  wire        airGalletSoundWrite;
+  wire        airGalletLayer0Vram8Select;
+  wire        airGalletLayer1Vram8Select;
+  wire        airGalletLayer2Vram8Select;
+  wire        airGalletLayer0RegsSelect;
+  wire        airGalletLayer1RegsSelect;
+  wire        airGalletLayer2RegsSelect;
+  wire        airGalletInput0Read;
+  wire        airGalletInput1Read;
+  wire        airGalletEepromWrite;
+  wire        airGalletPaletteSelect;
+  wire [14:0] airGalletPaletteRamAddr;
+  wire        airGalletExtraRomSelect;
+  wire        airGalletWorkRamSelect;
+  wire [14:0] airGalletWorkRamAddr;
+  wire        airGalletProgRomReady;
+  wire        airGalletIrqRead;
+  wire [1:0]  airGalletIrqWordOffset;
+  wire        airGalletVideoIrqClear;
+  wire        airGalletUnknownIrqClear;
+  wire        airGalletSpriteSwapWrite;
+  wire        airGalletSyncDtack;
+  wire        airGalletCycle;
+  wire        airGalletUnmappedCycle;
+  wire        airGalletProgRomRead;
+  wire        airGalletWorkRamRead;
+  wire        airGalletWorkRamWrite;
+  wire        airGalletMainRamRead;
+  wire        airGalletMainRamWrite;
+  wire        airGalletSpriteRamRead;
+  wire        airGalletSpriteRamWrite;
+  wire        airGalletLayer0Vram8Read;
+  wire        airGalletLayer1Vram8Read;
+  wire        airGalletLayer2Vram8Read;
+  wire        airGalletLayer0Vram8Write;
+  wire        airGalletLayer1Vram8Write;
+  wire        airGalletLayer2Vram8Write;
+  wire        airGalletLayer0RegsWrite;
+  wire        airGalletLayer1RegsWrite;
+  wire        airGalletLayer2RegsWrite;
+  wire        airGalletPaletteRead;
+  wire        airGalletPaletteWrite;
+  wire        airGalletSpriteRegsWrite;
+  wire        airGalletCpuSpace;
+  wire        airGalletOpenBusSelect;
+  wire        airGalletDtack;
+  wire        airGalletReadDataValid;
+  wire [15:0] airGalletReadData;
+
+  wire [14:0] airGalletTilemapOffset = cpuByteAddr[14:0];
+  wire        airGalletTilemapVram16 = airGalletTilemapOffset < 15'h1000;
+  wire        airGalletTilemapLine =
+    (airGalletTilemapOffset >= 15'h1000) & (airGalletTilemapOffset < 15'h1800);
+  wire        airGalletTilemapScratch =
+    (airGalletTilemapOffset >= 15'h1800) & (airGalletTilemapOffset < 15'h4000);
+  wire        airGalletTilemapVram8 = airGalletTilemapOffset >= 15'h4000;
+  wire [12:0] airGalletTilemapScratchAddr = airGalletTilemapOffset[13:1] - 13'h0c00;
+  wire        airGalletLayer0Vram16Read = airGalletLayer0Vram8Read & airGalletTilemapVram16;
+  wire        airGalletLayer0Vram16Write = airGalletLayer0Vram8Write & airGalletTilemapVram16;
+  wire        airGalletLayer0LineRead = airGalletLayer0Vram8Read & airGalletTilemapLine;
+  wire        airGalletLayer0LineWrite = airGalletLayer0Vram8Write & airGalletTilemapLine;
+  wire        airGalletLayer0ScratchRead = airGalletLayer0Vram8Read & airGalletTilemapScratch;
+  wire        airGalletLayer0ScratchWrite = airGalletLayer0Vram8Write & airGalletTilemapScratch;
+  wire        airGalletLayer0Vram8OnlyRead = airGalletLayer0Vram8Read & airGalletTilemapVram8;
+  wire        airGalletLayer0Vram8OnlyWrite = airGalletLayer0Vram8Write & airGalletTilemapVram8;
+  wire        airGalletLayer1Vram16Read = airGalletLayer1Vram8Read & airGalletTilemapVram16;
+  wire        airGalletLayer1Vram16Write = airGalletLayer1Vram8Write & airGalletTilemapVram16;
+  wire        airGalletLayer1LineRead = airGalletLayer1Vram8Read & airGalletTilemapLine;
+  wire        airGalletLayer1LineWrite = airGalletLayer1Vram8Write & airGalletTilemapLine;
+  wire        airGalletLayer1ScratchRead = airGalletLayer1Vram8Read & airGalletTilemapScratch;
+  wire        airGalletLayer1ScratchWrite = airGalletLayer1Vram8Write & airGalletTilemapScratch;
+  wire        airGalletLayer1Vram8OnlyRead = airGalletLayer1Vram8Read & airGalletTilemapVram8;
+  wire        airGalletLayer1Vram8OnlyWrite = airGalletLayer1Vram8Write & airGalletTilemapVram8;
+  wire        airGalletLayer2Vram16Read = airGalletLayer2Vram8Read & airGalletTilemapVram16;
+  wire        airGalletLayer2Vram16Write = airGalletLayer2Vram8Write & airGalletTilemapVram16;
+  wire        airGalletLayer2LineRead = airGalletLayer2Vram8Read & airGalletTilemapLine;
+  wire        airGalletLayer2LineWrite = airGalletLayer2Vram8Write & airGalletTilemapLine;
+  wire        airGalletLayer2ScratchRead = airGalletLayer2Vram8Read & airGalletTilemapScratch;
+  wire        airGalletLayer2ScratchWrite = airGalletLayer2Vram8Write & airGalletTilemapScratch;
+  wire        airGalletLayer2Vram8OnlyRead = airGalletLayer2Vram8Read & airGalletTilemapVram8;
+  wire        airGalletLayer2Vram8OnlyWrite = airGalletLayer2Vram8Write & airGalletTilemapVram8;
+  wire [15:0] airGalletLayer0ScratchData;
+  wire [15:0] airGalletLayer1ScratchData;
+  wire [15:0] airGalletLayer2ScratchData;
+  wire [15:0] airGalletLayer0VramData =
+    airGalletTilemapVram16 ? _vram16x16_0_io_portA_dout :
+    airGalletTilemapLine   ? _lineRam_0_io_portA_dout :
+    airGalletTilemapScratch ? airGalletLayer0ScratchData :
+    airGalletTilemapVram8  ? _vram8x8_0_io_portA_dout :
+    16'h0000;
+  wire [15:0] airGalletLayer1VramData =
+    airGalletTilemapVram16 ? _vram16x16_1_io_portA_dout :
+    airGalletTilemapLine   ? _lineRam_1_io_portA_dout :
+    airGalletTilemapScratch ? airGalletLayer1ScratchData :
+    airGalletTilemapVram8  ? _vram8x8_1_io_portA_dout :
+    16'h0000;
+  wire [15:0] airGalletLayer2VramData =
+    airGalletTilemapVram16 ? _vram16x16_2_io_portA_dout :
+    airGalletTilemapLine   ? _lineRam_2_io_portA_dout :
+    airGalletTilemapScratch ? airGalletLayer2ScratchData :
+    airGalletTilemapVram8  ? _vram8x8_2_io_portA_dout :
+    16'h0000;
+  wire [15:0] airGalletWorkRamData;
+
+  assign airGalletVideoIrqClear =
+    gameIsAirGallet & airGalletIrqRead & (airGalletIrqWordOffset == 2'h2);
+  assign airGalletUnknownIrqClear =
+    gameIsAirGallet & airGalletIrqRead & (airGalletIrqWordOffset == 2'h3);
 
   MazingerMainMap mazingerMainMap(
     .clock                (clock),
@@ -595,6 +711,87 @@ module Main(
     .boot_watchdog_trip         (mazingerBootWatchdogTrip),
     .read_data_valid      (mazingerReadDataValid),
     .read_data            (mazingerReadData)
+  );
+
+  AirGalletMainMap airGalletMainMap(
+    .game_active          (gameIsAirGallet),
+    .cpu_addr             (_cpu_io_addr),
+    .cpu_fc               (_cpu_io_fc),
+    .cpu_as               (_cpu_io_as),
+    .cpu_rw               (_cpu_io_rw),
+    .read_strobe          (readStrobe),
+    .write_strobe         (writeStrobe),
+    .prog_rom_valid       (io_progRom_valid),
+    .dtack_reg            (dtackReg),
+    .agallet_irq          (agalletIrq),
+    .unknown_irq          (unknownIrq),
+    .video_irq            (videoIrq),
+    .input1_data          (inputPort1),
+    .input0_data          (inputPort0),
+    .palette_data         (_paletteRam_io_portA_dout),
+    .layer0_regs_data     (_layerRegs_0_io_mem_dout),
+    .layer1_regs_data     (_layerRegs_1_io_mem_dout),
+    .layer2_regs_data     (_layerRegs_2_io_mem_dout),
+    .layer0_vram8_data    (airGalletLayer0VramData),
+    .layer1_vram8_data    (airGalletLayer1VramData),
+    .layer2_vram8_data    (airGalletLayer2VramData),
+    .sound_data           (io_soundCtrl_reply),
+    .sprite_ram_data      (_spriteRam_io_portA_dout),
+    .work_ram_data        (airGalletWorkRamData),
+    .main_ram_data        (_mainRam_io_dout),
+    .prog_rom_data        (io_progRom_dout),
+    .cpu_byte_addr        (airGalletCpuByteAddr),
+    .prog_rom_select      (airGalletProgRomSelect),
+    .main_ram_select      (airGalletMainRamSelect),
+    .sprite_ram_select    (airGalletSpriteRamSelect),
+    .sound_flags_read     (airGalletSoundFlagsRead),
+    .sound_read           (airGalletSoundRead),
+    .sound_write          (airGalletSoundWrite),
+    .layer0_vram8_select  (airGalletLayer0Vram8Select),
+    .layer1_vram8_select  (airGalletLayer1Vram8Select),
+    .layer2_vram8_select  (airGalletLayer2Vram8Select),
+    .layer0_regs_select   (airGalletLayer0RegsSelect),
+    .layer1_regs_select   (airGalletLayer1RegsSelect),
+    .layer2_regs_select   (airGalletLayer2RegsSelect),
+    .input0_read          (airGalletInput0Read),
+    .input1_read          (airGalletInput1Read),
+    .eeprom_write         (airGalletEepromWrite),
+    .palette_select       (airGalletPaletteSelect),
+    .palette_ram_addr     (airGalletPaletteRamAddr),
+    .extra_rom_select     (airGalletExtraRomSelect),
+    .work_ram_select      (airGalletWorkRamSelect),
+    .work_ram_addr        (airGalletWorkRamAddr),
+    .prog_rom_ready       (airGalletProgRomReady),
+    .irq_read             (airGalletIrqRead),
+    .irq_word_offset      (airGalletIrqWordOffset),
+    .sprite_swap_write    (airGalletSpriteSwapWrite),
+    .sync_dtack           (airGalletSyncDtack),
+    .cycle                (airGalletCycle),
+    .unmapped_cycle       (airGalletUnmappedCycle),
+    .prog_rom_read        (airGalletProgRomRead),
+    .work_ram_read        (airGalletWorkRamRead),
+    .work_ram_write       (airGalletWorkRamWrite),
+    .main_ram_read        (airGalletMainRamRead),
+    .main_ram_write       (airGalletMainRamWrite),
+    .sprite_ram_read      (airGalletSpriteRamRead),
+    .sprite_ram_write     (airGalletSpriteRamWrite),
+    .layer0_vram8_read    (airGalletLayer0Vram8Read),
+    .layer1_vram8_read    (airGalletLayer1Vram8Read),
+    .layer2_vram8_read    (airGalletLayer2Vram8Read),
+    .layer0_vram8_write   (airGalletLayer0Vram8Write),
+    .layer1_vram8_write   (airGalletLayer1Vram8Write),
+    .layer2_vram8_write   (airGalletLayer2Vram8Write),
+    .layer0_regs_write    (airGalletLayer0RegsWrite),
+    .layer1_regs_write    (airGalletLayer1RegsWrite),
+    .layer2_regs_write    (airGalletLayer2RegsWrite),
+    .palette_read         (airGalletPaletteRead),
+    .palette_write        (airGalletPaletteWrite),
+    .sprite_regs_write    (airGalletSpriteRegsWrite),
+    .cpu_space            (airGalletCpuSpace),
+    .open_bus_select      (airGalletOpenBusSelect),
+    .dtack                (airGalletDtack),
+    .read_data_valid      (airGalletReadDataValid),
+    .read_data            (airGalletReadData)
   );
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   reg  [63:0] mazingerDebugSeen;
@@ -799,6 +996,180 @@ module Main(
     mazingerDebugFirstLayer0Reg1Data[7:0],
     mazingerDebugFirstLayer0Reg0Data[15:8],
     mazingerDebugFirstLayer0Reg0Data[7:0]
+  };
+
+  reg  [63:0] airGalletDebugSeen;
+  reg  [23:0] airGalletDebugLastAddr;
+  reg  [23:0] airGalletDebugPrevAddr;
+  reg  [23:0] airGalletDebugLastProgAddr;
+  reg  [15:0] airGalletDebugLastDout;
+  reg  [15:0] airGalletDebugLastDin;
+  reg  [7:0]  airGalletDebugLastSelect;
+  reg  [7:0]  airGalletDebugReadSeen;
+  reg  [7:0]  airGalletDebugWriteSeen;
+  reg  [7:0]  airGalletDebugIrqSeen;
+  reg  [7:0]  airGalletDebugMilestones;
+  reg  [7:0]  airGalletDebugLayer0Seen;
+  reg  [7:0]  airGalletDebugLayer1Seen;
+  reg  [7:0]  airGalletDebugLayer2Seen;
+  reg         airGalletDebugFirstUnmappedValid;
+  reg  [23:0] airGalletDebugFirstUnmappedAddr;
+
+  wire [7:0] airGalletDebugPipelineRow0 = {
+    airGalletCpuByteAddr != airGalletDebugPrevAddr,
+    airGalletProgRomReady,
+    io_progRom_valid,
+    io_progRom_rd,
+    airGalletDtack,
+    writeStrobe,
+    readStrobe,
+    airGalletCycle
+  };
+  wire [7:0] airGalletDebugSelectNow = {
+    airGalletProgRomSelect,
+    airGalletExtraRomSelect,
+    airGalletMainRamSelect,
+    airGalletSpriteRamSelect,
+    airGalletPaletteSelect,
+    airGalletLayer0Vram8Select,
+    airGalletLayer1Vram8Select,
+    airGalletLayer2Vram8Select
+  };
+  wire [7:0] airGalletDebugReadNow = {
+    airGalletInput0Read,
+    airGalletInput1Read,
+    airGalletPaletteRead,
+    airGalletIrqRead,
+    airGalletSoundFlagsRead,
+    airGalletSoundRead,
+    io_soundCtrl_reply != 16'h00ff,
+    airGalletOpenBusSelect
+  };
+  wire [7:0] airGalletDebugWriteNow = {
+    airGalletMainRamWrite,
+    airGalletSpriteRamWrite,
+    airGalletPaletteWrite,
+    airGalletLayer0Vram8Write,
+    airGalletLayer1Vram8Write,
+    airGalletLayer2Vram8Write,
+    airGalletSoundWrite,
+    airGalletEepromWrite | airGalletSpriteSwapWrite
+  };
+  wire [7:0] airGalletDebugIrqNow = {
+    pauseActive,
+    _cpu_io_vpa,
+    |(_cpu_io_ipl),
+    io_video_vBlank,
+    videoVBlankRising,
+    agalletIrq,
+    unknownIrq,
+    videoIrq
+  };
+  wire [7:0] airGalletDebugPipelineRow5 = {
+    io_soundCtrl_req,
+    io_soundCtrl_reply_rd,
+    io_soundCtrl_irq,
+    io_eeprom_wait_n,
+    io_eeprom_valid,
+    airGalletSpriteSwapWrite,
+    airGalletSyncDtack,
+    airGalletUnmappedCycle
+  };
+  wire [7:0] airGalletDebugLayer0Now = {
+    airGalletLayer0RegsWrite,
+    airGalletLayer0Vram8OnlyWrite,
+    airGalletLayer0ScratchWrite,
+    airGalletLayer0LineWrite,
+    airGalletLayer0Vram16Write,
+    io_gpuMem_layer_0_regs_r_1_enable,
+    io_gpuMem_layer_0_regs_r_1_tileSize,
+    io_gpuMem_layer_0_regs_r_1_rowSelectEnable
+  };
+  wire [7:0] airGalletDebugLayer1Now = {
+    airGalletLayer1RegsWrite,
+    airGalletLayer1Vram8OnlyWrite,
+    airGalletLayer1ScratchWrite,
+    airGalletLayer1LineWrite,
+    airGalletLayer1Vram16Write,
+    io_gpuMem_layer_1_regs_r_1_enable,
+    io_gpuMem_layer_1_regs_r_1_tileSize,
+    io_gpuMem_layer_1_regs_r_1_rowSelectEnable
+  };
+  wire [7:0] airGalletDebugLayer2Now = {
+    airGalletLayer2RegsWrite,
+    airGalletLayer2Vram8OnlyWrite,
+    airGalletLayer2ScratchWrite,
+    airGalletLayer2LineWrite,
+    airGalletLayer2Vram16Write,
+    io_gpuMem_layer_2_regs_r_1_enable,
+    io_gpuMem_layer_2_regs_r_1_tileSize,
+    io_gpuMem_layer_2_regs_r_1_rowSelectEnable
+  };
+  wire [7:0] airGalletDebugLayerStatus = {
+    io_gpuMem_layer_2_regs_r_1_enable,
+    io_gpuMem_layer_2_regs_r_1_tileSize,
+    io_gpuMem_layer_1_regs_r_1_enable,
+    io_gpuMem_layer_1_regs_r_1_tileSize,
+    io_gpuMem_layer_0_regs_r_1_enable,
+    io_gpuMem_layer_0_regs_r_1_tileSize,
+    airGalletTilemapVram8,
+    airGalletTilemapVram16 | airGalletTilemapLine | airGalletTilemapScratch
+  };
+  wire [63:0] airGalletDebugEventBits = {
+    airGalletDebugMilestones,
+    airGalletDebugPipelineRow5,
+    airGalletDebugIrqNow,
+    airGalletDebugWriteNow,
+    airGalletDebugReadNow,
+    airGalletDebugSelectNow,
+    airGalletDebugPipelineRow0,
+    io_soundCtrl_reply[7:0]
+  };
+  wire [63:0] airGalletDebugCpuBits = {
+    airGalletDebugIrqSeen,
+    airGalletDebugWriteSeen,
+    airGalletDebugReadSeen,
+    airGalletDebugLastSelect,
+    airGalletDebugLastAddr[7:0],
+    airGalletDebugLastAddr[15:8],
+    airGalletDebugLastAddr[23:16],
+    airGalletDebugMilestones
+  };
+  wire [63:0] airGalletDebugWriteBits = {
+    airGalletDebugLastDout[7:0],
+    airGalletDebugLastDout[15:8],
+    airGalletDebugLastDin[7:0],
+    airGalletDebugLastDin[15:8],
+    airGalletDebugWriteSeen,
+    airGalletDebugReadSeen,
+    airGalletDebugLastSelect,
+    {7'h0, airGalletDebugFirstUnmappedValid}
+  };
+  wire [63:0] airGalletDebugDataBits = {
+    airGalletDebugFirstUnmappedAddr[7:0],
+    airGalletDebugFirstUnmappedAddr[15:8],
+    airGalletDebugFirstUnmappedAddr[23:16],
+    airGalletDebugLastProgAddr[7:0],
+    airGalletDebugLastProgAddr[15:8],
+    airGalletDebugLastProgAddr[23:16],
+    airGalletDebugMilestones,
+    io_soundCtrl_reply[7:0]
+  };
+  wire [63:0] airGalletDebugLiveBits = {
+    airGalletDebugLayerStatus,
+    airGalletDebugLayer2Seen,
+    airGalletDebugLayer1Seen,
+    airGalletDebugLayer0Seen,
+    airGalletDebugLayer2Now,
+    airGalletDebugLayer1Now,
+    airGalletDebugLayer0Now,
+    airGalletDebugLastAddr[7:0]
+  };
+  wire [63:0] airGalletDebugPaletteBits = {
+    airGalletDebugLastDout,
+    airGalletDebugLastDin,
+    airGalletDebugLastAddr[15:0],
+    airGalletDebugLastProgAddr[15:0]
   };
 `endif
   wire        cs_1 = cpuByteAddr > 24'h10FFFF & cpuByteAddr < 24'h200000;
@@ -1197,41 +1568,53 @@ module Main(
   reg  [15:0] tmp_31;
   wire        cs_191 = cpuByteAddr > 24'h8FFFFF & cpuByteAddr < 24'h901000;
   wire        vram16x16_1_io_portA_rd =
-    gameIsHotdogStorm ? cs_191 & readStrobe : _GEN_169;
+    gameIsAirGallet ? airGalletLayer1Vram16Read
+      : gameIsHotdogStorm ? cs_191 & readStrobe : _GEN_169;
   wire        vram16x16_1_io_portA_wr =
-    gameIsHotdogStorm ? cs_191 & writeStrobe : _GEN_170;
+    gameIsAirGallet ? airGalletLayer1Vram16Write
+      : gameIsHotdogStorm ? cs_191 & writeStrobe : _GEN_170;
   wire        cs_192 = cpuByteAddr > 24'h900FFF & cpuByteAddr < 24'h901800;
   wire        lineRam_1_io_portA_rd =
-    gameIsHotdogStorm ? cs_192 & readStrobe : _GEN_171;
+    gameIsAirGallet ? airGalletLayer1LineRead
+      : gameIsHotdogStorm ? cs_192 & readStrobe : _GEN_171;
   wire        lineRam_1_io_portA_wr =
-    gameIsHotdogStorm ? cs_192 & writeStrobe : _GEN_172;
+    gameIsAirGallet ? airGalletLayer1LineWrite
+      : gameIsHotdogStorm ? cs_192 & writeStrobe : _GEN_172;
   reg  [15:0] tmp_32;
   wire        cs_194 = cpuByteAddr > 24'h903FFF & cpuByteAddr < 24'h908000;
   wire        vram8x8_1_io_portA_rd =
-    gameIsMazinger ? mazingerLayer1Vram8Read
+    gameIsAirGallet ? airGalletLayer1Vram8OnlyRead
+      : gameIsMazinger ? mazingerLayer1Vram8Read
       : gameIsHotdogStorm ? cs_194 & readStrobe : _GEN_173;
   wire        vram8x8_1_io_portA_wr =
-    gameIsMazinger ? mazingerLayer1Vram8Write
+    gameIsAirGallet ? airGalletLayer1Vram8OnlyWrite
+      : gameIsMazinger ? mazingerLayer1Vram8Write
       : gameIsHotdogStorm ? cs_194 & writeStrobe : _GEN_174;
   reg  [15:0] tmp_33;
   wire        cs_196 = cpuByteAddr > 24'h97FFFF & cpuByteAddr < 24'h981000;
   wire        vram16x16_2_io_portA_rd =
-    gameIsHotdogStorm ? cs_196 & readStrobe : _GEN_175;
+    gameIsAirGallet ? airGalletLayer2Vram16Read
+      : gameIsHotdogStorm ? cs_196 & readStrobe : _GEN_175;
   wire        vram16x16_2_io_portA_wr =
-    gameIsHotdogStorm ? cs_196 & writeStrobe : _GEN_176;
+    gameIsAirGallet ? airGalletLayer2Vram16Write
+      : gameIsHotdogStorm ? cs_196 & writeStrobe : _GEN_176;
   wire        cs_197 = cpuByteAddr > 24'h980FFF & cpuByteAddr < 24'h981800;
   wire        lineRam_2_io_portA_rd =
-    gameIsHotdogStorm ? cs_197 & readStrobe : _GEN_177;
+    gameIsAirGallet ? airGalletLayer2LineRead
+      : gameIsHotdogStorm ? cs_197 & readStrobe : _GEN_177;
   wire        lineRam_2_io_portA_wr =
-    gameIsHotdogStorm ? cs_197 & writeStrobe : _GEN_178;
+    gameIsAirGallet ? airGalletLayer2LineWrite
+      : gameIsHotdogStorm ? cs_197 & writeStrobe : _GEN_178;
   reg  [15:0] tmp_34;
   wire        cs_199 = cpuByteAddr > 24'h983FFF & cpuByteAddr < 24'h988000;
   wire        vram8x8_2_io_portA_rd =
-    gameIsHotdogStorm ? cs_199 & readStrobe : _GEN_179;
+    gameIsAirGallet ? airGalletLayer2Vram8OnlyRead
+      : gameIsHotdogStorm ? cs_199 & readStrobe : _GEN_179;
   wire        vram8x8_2_io_portA_wr =
-    gameIsHotdogStorm ? cs_199 & writeStrobe : _GEN_180;
+    gameIsAirGallet ? airGalletLayer2Vram8OnlyWrite
+      : gameIsHotdogStorm ? cs_199 & writeStrobe : _GEN_180;
   wire [12:0] vram8x8_2_io_portA_addr =
-    gameIsHotdogStorm | gameIsGuwange | gameIsGaia | gameIsEsprade
+    gameIsAirGallet | gameIsHotdogStorm | gameIsGuwange | gameIsGaia | gameIsEsprade
       ? _cpu_io_addr[12:0]
       : _GEN_66;
   reg  [15:0] tmp_35;
@@ -1245,48 +1628,65 @@ module Main(
   wire        _GEN_205 = gameIsHotdogStorm ? cs_206 & writeStrobe : _GEN_183;
   wire        cs_207 = cpuByteAddr > 24'hB7FFFF & cpuByteAddr < 24'hB80006;
   wire        layerRegs_1_io_mem_wr =
-    gameIsMazinger ? mazingerLayer1RegsWrite
+    gameIsAirGallet ? airGalletLayer1RegsWrite
+      : gameIsMazinger ? mazingerLayer1RegsWrite
       : gameIsHotdogStorm ? cs_207 & writeStrobe : _GEN_184;
   wire        cs_208 = cpuByteAddr > 24'hBFFFFF & cpuByteAddr < 24'hC00006;
   wire        layerRegs_2_io_mem_wr =
-    gameIsHotdogStorm ? cs_208 & writeStrobe : _GEN_185;
+    gameIsAirGallet ? airGalletLayer2RegsWrite
+      : gameIsHotdogStorm ? cs_208 & writeStrobe : _GEN_185;
   wire        cs_213 = cpuByteAddr > 24'hEFFFFF & cpuByteAddr < 24'hF10000;
   wire        _GEN_206 = gameIsHotdogStorm ? cs_213 & readStrobe : _GEN_161;
   wire        _GEN_207 = gameIsHotdogStorm ? cs_213 & writeStrobe : _GEN_162;
   wire        cs_214 = cpuByteAddr < 24'h100000;
   wire        cs_215 = (|(_cpu_io_addr[22:19])) & cpuByteAddr < 24'h110000;
   wire        mainRam_io_rd =
-    gameIsMazinger ? mazingerMainRamRead
+    gameIsAirGallet ? airGalletMainRamRead
+      : gameIsMazinger ? mazingerMainRamRead
       : gameIsUopoko ? cs_215 & readStrobe : _GEN_190;
   wire        mainRam_io_wr =
-    gameIsMazinger ? mazingerMainRamWrite
+    gameIsAirGallet ? airGalletMainRamWrite
+      : gameIsMazinger ? mazingerMainRamWrite
       : gameIsUopoko ? cs_215 & writeStrobe : _GEN_191;
   wire        cs_216 = cpuByteAddr > 24'h2FFFFF & cpuByteAddr < 24'h300004;
   wire        cs_217 = (|(_cpu_io_addr[22:21])) & cpuByteAddr < 24'h410000;
   wire        spriteRam_io_portA_rd =
-    gameIsMazinger ? mazingerSpriteRamRead
+    gameIsAirGallet ? airGalletSpriteRamRead
+      : gameIsMazinger ? mazingerSpriteRamRead
       : gameIsUopoko ? cs_217 & readStrobe : _GEN_206;
   wire        spriteRam_io_portA_wr =
-    gameIsMazinger ? mazingerSpriteRamWrite
+    gameIsAirGallet ? airGalletSpriteRamWrite
+      : gameIsMazinger ? mazingerSpriteRamWrite
       : gameIsUopoko ? cs_217 & writeStrobe : _GEN_207;
   wire        cs_218 = cpuByteAddr > 24'h4FFFFF & cpuByteAddr < 24'h501000;
-  wire        vram16x16_0_io_portA_rd = gameIsUopoko ? cs_218 & readStrobe : _GEN_195;
-  wire        vram16x16_0_io_portA_wr = gameIsUopoko ? cs_218 & writeStrobe : _GEN_196;
+  wire        vram16x16_0_io_portA_rd =
+    gameIsAirGallet ? airGalletLayer0Vram16Read
+      : gameIsUopoko ? cs_218 & readStrobe : _GEN_195;
+  wire        vram16x16_0_io_portA_wr =
+    gameIsAirGallet ? airGalletLayer0Vram16Write
+      : gameIsUopoko ? cs_218 & writeStrobe : _GEN_196;
   wire        cs_219 = cpuByteAddr > 24'h500FFF & cpuByteAddr < 24'h501800;
-  wire        lineRam_0_io_portA_rd = gameIsUopoko ? cs_219 & readStrobe : _GEN_197;
-  wire        lineRam_0_io_portA_wr = gameIsUopoko ? cs_219 & writeStrobe : _GEN_198;
+  wire        lineRam_0_io_portA_rd =
+    gameIsAirGallet ? airGalletLayer0LineRead
+      : gameIsUopoko ? cs_219 & readStrobe : _GEN_197;
+  wire        lineRam_0_io_portA_wr =
+    gameIsAirGallet ? airGalletLayer0LineWrite
+      : gameIsUopoko ? cs_219 & writeStrobe : _GEN_198;
   reg  [15:0] tmp_36;
   wire        cs_221 = cpuByteAddr > 24'h503FFF & cpuByteAddr < 24'h508000;
   wire        vram8x8_0_io_portA_rd =
-    gameIsMazinger ? mazingerLayer0Vram8Read
+    gameIsAirGallet ? airGalletLayer0Vram8OnlyRead
+      : gameIsMazinger ? mazingerLayer0Vram8Read
       : gameIsUopoko ? cs_221 & readStrobe : _GEN_199;
   wire        vram8x8_0_io_portA_wr =
-    gameIsMazinger ? mazingerLayer0Vram8Write
+    gameIsAirGallet ? airGalletLayer0Vram8OnlyWrite
+      : gameIsMazinger ? mazingerLayer0Vram8Write
       : gameIsUopoko ? cs_221 & writeStrobe : _GEN_200;
   reg  [15:0] tmp_37;
   wire        cs_224 = cpuByteAddr > 24'h5FFFFF & cpuByteAddr < 24'h600010;
   wire        spriteRegs_io_mem_wr =
-    gameIsMazinger ? mazingerSpriteRegsWrite
+    gameIsAirGallet ? airGalletSpriteRegsWrite
+      : gameIsMazinger ? mazingerSpriteRegsWrite
       : gameIsUopoko ? mem_7_wr : _GEN_201;
   wire [2:0]  spriteRegs_io_mem_addr =
     gameIsUopoko | gameIsHotdogStorm | gameIsGuwange | gameIsGaia | gameIsEsprade | gameIsDoDonPachi
@@ -1297,17 +1697,21 @@ module Main(
   wire        _GEN_209 = cpuByteAddr > 24'h600007 & cpuByteAddr < 24'h600009 & writeStrobe;
   wire        cs_227 = cpuByteAddr > 24'h6FFFFF & cpuByteAddr < 24'h700006;
   wire        layerRegs_0_io_mem_wr =
-    gameIsMazinger ? mazingerLayer0RegsWrite
+    gameIsAirGallet ? airGalletLayer0RegsWrite
+      : gameIsMazinger ? mazingerLayer0RegsWrite
       : gameIsUopoko ? cs_227 & writeStrobe : _GEN_205;
   wire        cs_228 = _cpu_io_addr[22] & cpuByteAddr < 24'h810000;
   wire        paletteRam_io_portA_rd =
-    gameIsMazinger ? mazingerPaletteRead
+    gameIsAirGallet ? airGalletPaletteRead
+      : gameIsMazinger ? mazingerPaletteRead
       : gameIsUopoko ? cs_228 & readStrobe : _GEN_192;
   wire        paletteRam_io_portA_wr =
-    gameIsMazinger ? mazingerPaletteWrite
+    gameIsAirGallet ? airGalletPaletteWrite
+      : gameIsMazinger ? mazingerPaletteWrite
       : gameIsUopoko ? cs_228 & writeStrobe : _GEN_193;
   wire [14:0] paletteRam_io_portA_addr =
-    gameIsMazinger ? mazingerPaletteRamAddr
+    gameIsAirGallet ? airGalletPaletteRamAddr
+      : gameIsMazinger ? mazingerPaletteRamAddr
       : gameIsUopoko ? _cpu_io_addr[14:0] : _GEN_194;
   wire        _GEN_210 = videoVBlankRising | videoIrq;
   wire        _GEN_218 = cs_1 & readStrobe;
@@ -1556,7 +1960,8 @@ module Main(
   wire        _GEN_429 = gameIsGuwange ? cs_179 & writeStrobe : _GEN_428;
   wire        _GEN_430 = gameIsHotdogStorm ? cs_211 & writeStrobe : _GEN_429;
   wire        eepromMem_wr =
-    gameIsMazinger ? mazingerEepromWrite
+    gameIsAirGallet ? airGalletEepromWrite
+      : gameIsMazinger ? mazingerEepromWrite
       : gameIsUopoko ? cs_231 & writeStrobe : _GEN_430;
   wire        cs_120 = cpuByteAddr > 24'h5017FF & cpuByteAddr < 24'h504000;
   wire        cs_122 = cpuByteAddr > 24'h507FFF & cpuByteAddr < 24'h510000;
@@ -1834,17 +2239,25 @@ module Main(
     end
     else begin
       videoIrq <=
-        gameIsMazinger
+        gameIsAirGallet
+          ? (videoIrq | videoVBlankRising) & ~airGalletVideoIrqClear
+        : gameIsMazinger
           ? videoVBlankRising | (videoIrq & ~mazingerVideoIrqClear)
           : _GEN_421 ? ~(_offset_T_222 == 24'h4 | _GEN_412) & _GEN_385 : ~_GEN_412 & _GEN_385;
       agalletIrq <= videoVBlankRising | (~videoVBlankFalling & agalletIrq);
       unknownIrq <=
-        gameIsMazinger
+        gameIsAirGallet
+          ? unknownIrq & ~airGalletUnknownIrqClear
+        : gameIsMazinger
           ? (unknownIrq | videoVBlankFalling) & ~mazingerUnknownIrqClear
           : _GEN_421 ? ~(_offset_T_222 == 24'h6 | _GEN_413) & _GEN_386 : ~_GEN_413 & _GEN_386;
       if (gameIsMazinger) begin
         if (mazingerReadDataValid)
           dinReg <= mazingerReadData;
+      end
+      else if (gameIsAirGallet) begin
+        if (airGalletReadDataValid)
+          dinReg <= airGalletReadData;
       end
       else if (gameIsUopoko) begin
         if (_GEN_423)
@@ -3976,7 +4389,9 @@ module Main(
       else if (_GEN_218)
         dinReg <= 16'h0;
       dtackReg <=
-        gameIsMazinger
+        gameIsAirGallet
+          ? airGalletDtack
+          : gameIsMazinger
           ? mazingerDtack
           : gameIsUopoko
           ? cs_231 & ~_cpu_io_rw | _cpu_io_as
@@ -4186,6 +4601,70 @@ module Main(
       end
     end
   end
+  always @(posedge clock) begin
+    if (reset | ~gameIsAirGallet) begin
+      airGalletDebugSeen <= 64'd0;
+      airGalletDebugLastAddr <= 24'd0;
+      airGalletDebugPrevAddr <= 24'd0;
+      airGalletDebugLastProgAddr <= 24'd0;
+      airGalletDebugLastDout <= 16'd0;
+      airGalletDebugLastDin <= 16'd0;
+      airGalletDebugLastSelect <= 8'd0;
+      airGalletDebugReadSeen <= 8'd0;
+      airGalletDebugWriteSeen <= 8'd0;
+      airGalletDebugIrqSeen <= 8'd0;
+      airGalletDebugMilestones <= 8'd0;
+      airGalletDebugLayer0Seen <= 8'd0;
+      airGalletDebugLayer1Seen <= 8'd0;
+      airGalletDebugLayer2Seen <= 8'd0;
+      airGalletDebugFirstUnmappedValid <= 1'b0;
+      airGalletDebugFirstUnmappedAddr <= 24'd0;
+    end
+    else begin
+      airGalletDebugSeen <= airGalletDebugSeen | airGalletDebugEventBits;
+      airGalletDebugReadSeen <= airGalletDebugReadSeen | airGalletDebugReadNow;
+      airGalletDebugWriteSeen <= airGalletDebugWriteSeen | airGalletDebugWriteNow;
+      airGalletDebugIrqSeen <= airGalletDebugIrqSeen | airGalletDebugIrqNow;
+      airGalletDebugLayer0Seen <= airGalletDebugLayer0Seen | airGalletDebugLayer0Now;
+      airGalletDebugLayer1Seen <= airGalletDebugLayer1Seen | airGalletDebugLayer1Now;
+      airGalletDebugLayer2Seen <= airGalletDebugLayer2Seen | airGalletDebugLayer2Now;
+
+      if (airGalletCycle) begin
+        airGalletDebugPrevAddr <= airGalletDebugLastAddr;
+        airGalletDebugLastAddr <= airGalletCpuByteAddr;
+        airGalletDebugLastSelect <= airGalletDebugSelectNow;
+      end
+
+      if (readStrobe | writeStrobe)
+        airGalletDebugLastDout <= _cpu_io_dout;
+      if (readStrobe)
+        airGalletDebugLastDin <= dinReg;
+
+      if (io_progRom_rd & io_progRom_valid) begin
+        airGalletDebugLastProgAddr <= {4'h0, io_progRom_addr};
+        airGalletDebugMilestones[0] <= 1'b1;
+      end
+      if (airGalletSoundWrite)
+        airGalletDebugMilestones[1] <= 1'b1;
+      if (airGalletSoundRead | airGalletSoundFlagsRead)
+        airGalletDebugMilestones[2] <= 1'b1;
+      if (airGalletPaletteWrite)
+        airGalletDebugMilestones[3] <= 1'b1;
+      if (airGalletSpriteRamWrite)
+        airGalletDebugMilestones[4] <= 1'b1;
+      if (airGalletLayer0Vram8Write | airGalletLayer1Vram8Write | airGalletLayer2Vram8Write)
+        airGalletDebugMilestones[5] <= 1'b1;
+      if (airGalletSpriteSwapWrite)
+        airGalletDebugMilestones[6] <= 1'b1;
+      if (airGalletOpenBusSelect) begin
+        airGalletDebugMilestones[7] <= 1'b1;
+        if (~airGalletDebugFirstUnmappedValid) begin
+          airGalletDebugFirstUnmappedValid <= 1'b1;
+          airGalletDebugFirstUnmappedAddr <= airGalletCpuByteAddr;
+        end
+      end
+    end
+  end
 `endif
   always @(posedge io_videoClock) begin
     io_gpuMem_layer_0_regs_r_tileSize <= _layerRegs_0_io_regs_1[13];
@@ -4290,6 +4769,62 @@ module Main(
     .mask  (mainRam_io_mask),
     .din   (_cpu_io_dout),
     .dout  (_mainRam_io_dout)
+  );
+  CaveSinglePortRam #(
+    .ADDR_WIDTH  (15),
+    .DATA_WIDTH  (16),
+    .DEPTH       (0),
+    .MASK_ENABLE (1)
+  ) airGalletWorkRam (
+    .clock (clock),
+    .rd    (airGalletWorkRamRead),
+    .wr    (airGalletWorkRamWrite),
+    .addr  (airGalletWorkRamAddr),
+    .mask  (mainRam_io_mask),
+    .din   (_cpu_io_dout),
+    .dout  (airGalletWorkRamData)
+  );
+  CaveSinglePortRam #(
+    .ADDR_WIDTH  (13),
+    .DATA_WIDTH  (16),
+    .DEPTH       (5120),
+    .MASK_ENABLE (1)
+  ) airGalletLayer0ScratchRam (
+    .clock (clock),
+    .rd    (airGalletLayer0ScratchRead),
+    .wr    (airGalletLayer0ScratchWrite),
+    .addr  (airGalletTilemapScratchAddr),
+    .mask  (mainRam_io_mask),
+    .din   (_cpu_io_dout),
+    .dout  (airGalletLayer0ScratchData)
+  );
+  CaveSinglePortRam #(
+    .ADDR_WIDTH  (13),
+    .DATA_WIDTH  (16),
+    .DEPTH       (5120),
+    .MASK_ENABLE (1)
+  ) airGalletLayer1ScratchRam (
+    .clock (clock),
+    .rd    (airGalletLayer1ScratchRead),
+    .wr    (airGalletLayer1ScratchWrite),
+    .addr  (airGalletTilemapScratchAddr),
+    .mask  (mainRam_io_mask),
+    .din   (_cpu_io_dout),
+    .dout  (airGalletLayer1ScratchData)
+  );
+  CaveSinglePortRam #(
+    .ADDR_WIDTH  (13),
+    .DATA_WIDTH  (16),
+    .DEPTH       (5120),
+    .MASK_ENABLE (1)
+  ) airGalletLayer2ScratchRam (
+    .clock (clock),
+    .rd    (airGalletLayer2ScratchRead),
+    .wr    (airGalletLayer2ScratchWrite),
+    .addr  (airGalletTilemapScratchAddr),
+    .mask  (mainRam_io_mask),
+    .din   (_cpu_io_dout),
+    .dout  (airGalletLayer2ScratchData)
   );
   assign _spriteRam_io_portA_addr = _cpu_io_addr[14:0];
   CaveTrueDualPortRam #(
@@ -4617,12 +5152,24 @@ module Main(
   assign io_gpuMem_sprite_regs_fixed = |(_spriteRegs_io_regs_5[13:12]);
   assign io_gpuMem_sprite_regs_hFlip = _spriteRegs_io_regs_0[15];
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  assign io_debug_pipeline = gameIsMazinger ? mazingerDebugSeen : 64'd0;
-  assign io_debug_cpu = gameIsMazinger ? mazingerDebugCpuBits : 64'd0;
-  assign io_debug_writes = gameIsMazinger ? mazingerDebugWriteBits : 64'd0;
-  assign io_debug_data = gameIsMazinger ? mazingerDebugDataBits : 64'd0;
-  assign io_debug_live = gameIsMazinger ? mazingerDebugLiveBits : 64'd0;
-  assign io_debug_palette = gameIsMazinger ? mazingerDebugPaletteBits : 64'd0;
+  assign io_debug_pipeline =
+    gameIsAirGallet ? airGalletDebugSeen :
+    gameIsMazinger ? mazingerDebugSeen : 64'd0;
+  assign io_debug_cpu =
+    gameIsAirGallet ? airGalletDebugCpuBits :
+    gameIsMazinger ? mazingerDebugCpuBits : 64'd0;
+  assign io_debug_writes =
+    gameIsAirGallet ? airGalletDebugWriteBits :
+    gameIsMazinger ? mazingerDebugWriteBits : 64'd0;
+  assign io_debug_data =
+    gameIsAirGallet ? airGalletDebugDataBits :
+    gameIsMazinger ? mazingerDebugDataBits : 64'd0;
+  assign io_debug_live =
+    gameIsAirGallet ? airGalletDebugLiveBits :
+    gameIsMazinger ? mazingerDebugLiveBits : 64'd0;
+  assign io_debug_palette =
+    gameIsAirGallet ? airGalletDebugPaletteBits :
+    gameIsMazinger ? mazingerDebugPaletteBits : 64'd0;
 `else
   assign io_debug_pipeline = 64'd0;
   assign io_debug_cpu = 64'd0;
@@ -4642,17 +5189,22 @@ module Main(
   assign io_soundCtrl_ymz_wr = gameIsUopoko ? cs_216 & writeStrobe : _GEN_182;
   assign io_soundCtrl_ymz_addr = _cpu_io_addr;
   assign io_soundCtrl_ymz_din = _cpu_io_dout;
-  assign io_soundCtrl_req = gameIsMazinger ? mazingerSoundWrite : gameIsHotdogStorm & _GEN_204;
+  assign io_soundCtrl_req =
+    gameIsAirGallet ? airGalletSoundWrite
+      : gameIsMazinger ? mazingerSoundWrite : gameIsHotdogStorm & _GEN_204;
   assign io_soundCtrl_data = _cpu_io_dout;
-  assign io_soundCtrl_reply_rd = gameIsMazinger & mazingerSoundRead;
+  assign io_soundCtrl_reply_rd =
+    (gameIsAirGallet & airGalletSoundRead) | (gameIsMazinger & mazingerSoundRead);
   assign io_progRom_rd =
-    gameIsMazinger ? mazingerProgRomRead
+    gameIsAirGallet ? airGalletProgRomRead
+      : gameIsMazinger ? mazingerProgRomRead
       : gameIsUopoko ? cs_214 & readStrobe : _GEN_189;
   assign io_progRom_addr =
     (gameIsMazinger & mazingerExtraRomSelect)
       ? {1'b1, cpuByteAddr[18:0]}
       : {_cpu_io_addr[18:0], 1'h0};
   assign io_spriteFrameBufferSwap =
-    gameIsMazinger ? videoVBlankRising
+    gameIsAirGallet ? airGalletSpriteSwapWrite
+      : gameIsMazinger ? videoVBlankRising
       : gameIsUopoko ? _GEN_209 | _GEN_203 | _GEN_160 : _GEN_203 | _GEN_160;
 endmodule

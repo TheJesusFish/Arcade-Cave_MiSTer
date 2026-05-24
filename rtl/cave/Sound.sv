@@ -36,6 +36,7 @@ module Sound(
 );
   wire        hotdogZ80;
   wire        mazingerZ80;
+  wire        airgalletZ80;
   wire        z80Game;
   wire        donpachi;
   wire        soundDeviceIsOki;
@@ -54,6 +55,7 @@ module Sound(
     .game_is_gaia                (),
     .game_is_hotdogstorm         (hotdogZ80),
     .game_is_mazinger            (mazingerZ80),
+    .game_is_airgallet           (airgalletZ80),
     .board_uses_z80_sound        (z80Game),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (soundDeviceIsYmz),
@@ -63,7 +65,7 @@ module Sound(
 
   reg         reqReg;
   reg  [15:0] dataReg;
-  reg  [3:0]  z80BankReg;
+  reg  [4:0]  z80BankReg;
   reg  [3:0]  okiBankHiReg;
   reg  [3:0]  okiBankLoReg;
   reg  [15:0] ymzAudioReg;
@@ -102,23 +104,27 @@ module Sound(
   wire        z80RamSelect =
     hotdogZ80 ? cpuAddr > 16'hDFFF :
     mazingerZ80 ? ((cpuAddr > 16'hBFFF) & (cpuAddr < 16'hC800)) | (cpuAddr > 16'hF7FF) :
+    airgalletZ80 ? cpuAddr >= 16'hC000 :
                   1'b0;
   wire [15:0] cpuIoAddr = {8'h00, cpuAddr[7:0]};
   wire        z80IoWr = z80Game & cpuIorq & cpuWr;
   wire        z80IoWrPulse = z80IoWr & ~z80IoWrD;
   wire        latchLowRead = z80Game & (cpuIoAddr == 16'h0030) & cpuIorq & cpuRd;
-  wire        latchHighRead = hotdogZ80 & (cpuIoAddr == 16'h0040) & cpuIorq & cpuRd;
+  wire        latchHighRead = (hotdogZ80 | airgalletZ80) & (cpuIoAddr == 16'h0040) & cpuIorq & cpuRd;
+  wire        soundFlagsRead = airgalletZ80 & (cpuIoAddr == 16'h0020) & cpuIorq & cpuRd;
   wire        ym2203Write = z80Game & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052) & z80IoWrPulse;
   wire        ym2203Read =
     ((hotdogZ80 & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052)) |
+     (airgalletZ80 & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052)) |
      (mazingerZ80 & (cpuIoAddr > 16'h0051) & (cpuIoAddr < 16'h0054))) & cpuIorq & cpuRd;
   wire        oki1Access =
     ((hotdogZ80 & (cpuIoAddr == 16'h0060)) |
+     (airgalletZ80 & (cpuIoAddr == 16'h0060)) |
      (mazingerZ80 & (cpuIoAddr == 16'h0070))) & cpuIorq;
-  wire        hotdogOkiBankWrite = hotdogZ80 & (cpuIoAddr == 16'h0070) & z80IoWrPulse;
+  wire        hotdogOkiBankWrite = (hotdogZ80 | airgalletZ80) & (cpuIoAddr == 16'h0070) & z80IoWrPulse;
   wire        mazingerOkiBankWrite = mazingerZ80 & (cpuIoAddr == 16'h0074) & z80IoWrPulse;
   wire        okiBankWrite = hotdogOkiBankWrite | mazingerOkiBankWrite;
-  wire        soundReplyWrite = mazingerZ80 & (cpuIoAddr == 16'h0010) & z80IoWrPulse;
+  wire        soundReplyWrite = (mazingerZ80 | airgalletZ80) & (cpuIoAddr == 16'h0010) & z80IoWrPulse;
   wire        replyPop = io_ctrl_reply_rd & (replyCount != 6'd0);
   wire        replyPush = soundReplyWrite & ((replyCount != 6'd32) | replyPop);
 
@@ -155,6 +161,7 @@ module Sound(
   wire [7:0]  cpuDin =
     oki1Access & cpuRd    ? oki1CpuDout :
     ym2203Read            ? ym2203CpuDout :
+    soundFlagsRead        ? 8'h00 :
     latchHighRead         ? dataReg[15:8] :
     latchLowRead          ? dataReg[7:0] :
     z80RamSelect & cpuMreq & cpuRd ? soundRamDout :
@@ -179,7 +186,7 @@ module Sound(
   always @(posedge clock) begin
     if (reset) begin
       reqReg <= 1'b0;
-      z80BankReg <= 4'h0;
+      z80BankReg <= 5'h0;
       okiBankHiReg <= 4'h0;
       okiBankLoReg <= 4'h0;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
@@ -217,7 +224,10 @@ module Sound(
 `endif
 
       if (z80Game & (cpuIoAddr == 16'h0000) & z80IoWrPulse)
-        z80BankReg <= mazingerZ80 ? {1'b0, cpuDout[2:0]} : cpuDout[3:0];
+        z80BankReg <=
+          airgalletZ80 ? cpuDout[4:0] :
+          mazingerZ80 ? {2'b00, cpuDout[2:0]} :
+                        {1'b0, cpuDout[3:0]};
 
       if (okiBankWrite) begin
         okiBankHiReg <= {2'b00, cpuDout[5:4]};
@@ -407,7 +417,7 @@ module Sound(
     .io_in_2_addr   ({9'h000, cpuAddr}),
     .io_in_2_dout   (progRomDout),
     .io_in_3_rd     (soundDeviceIsZ80 & z80Game & z80BankRomSelect & ~cpuRfsh),
-    .io_in_3_addr   ({7'h00, z80BankReg, cpuAddr[13:0]}),
+    .io_in_3_addr   ({6'h00, z80BankReg, cpuAddr[13:0]}),
     .io_in_3_dout   (bankRomDout),
     .io_out_rd      (io_rom_0_rd),
     .io_out_addr    (io_rom_0_addr),

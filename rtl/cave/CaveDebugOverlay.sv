@@ -367,7 +367,7 @@ module CaveDebugOverlay(
   end
 
   wire [2:0] debugGlyphY = debugTextRowY[4:2];
-  wire [7:0] debugSoundByte =
+  wire [7:0] debugTextByte =
     debugTextRow == 3'd0 ? io_debug_bits[7:0] :
     debugTextRow == 3'd1 ? io_debug_bits[15:8] :
     debugTextRow == 3'd2 ? io_debug_bits[23:16] :
@@ -383,39 +383,75 @@ module CaveDebugOverlay(
 
     case (debugTextCol)
       3'd0: begin
-        case (debugTextRow)
-          3'd0: debugSoundChar = 6'd12;         // C
-          3'd1: debugSoundChar = DEBUG_CH_R;
-          3'd2: debugSoundChar = 6'd11;         // B
-          3'd3: debugSoundChar = DEBUG_CH_P;
-          3'd4: debugSoundChar = DEBUG_CH_S;
-          default: debugSoundChar = DEBUG_CH_H;
-        endcase
+        if (io_debug_view == 3'd5) begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = DEBUG_CH_R;  // RPL
+            3'd1: debugSoundChar = DEBUG_CH_S;  // STA
+            3'd2: debugSoundChar = DEBUG_CH_P;  // PCH
+            3'd3: debugSoundChar = DEBUG_CH_P;  // PCM
+            3'd4: debugSoundChar = DEBUG_CH_P;  // PCL
+            default: debugSoundChar = 6'd10;    // ADH/ADM/ADL
+          endcase
+        end
+        else begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = 6'd12;       // CMD
+            3'd1: debugSoundChar = DEBUG_CH_R;  // RPL
+            3'd2: debugSoundChar = 6'd11;       // BNK
+            3'd3: debugSoundChar = DEBUG_CH_P;  // PHR
+            3'd4: debugSoundChar = DEBUG_CH_S;  // STA
+            default: debugSoundChar = DEBUG_CH_H;
+          endcase
+        end
       end
       3'd1: begin
-        case (debugTextRow)
-          3'd0: debugSoundChar = DEBUG_CH_M;
-          3'd1: debugSoundChar = DEBUG_CH_P;
-          3'd2: debugSoundChar = DEBUG_CH_N;
-          3'd3: debugSoundChar = DEBUG_CH_H;
-          3'd4: debugSoundChar = DEBUG_CH_T;
-          3'd5: debugSoundChar = 6'd0;
-          3'd6: debugSoundChar = 6'd1;
-          default: debugSoundChar = 6'd2;
-        endcase
+        if (io_debug_view == 3'd5) begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = DEBUG_CH_P;
+            3'd1: debugSoundChar = DEBUG_CH_T;
+            3'd2, 3'd3, 3'd4: debugSoundChar = 6'd12;  // C
+            default: debugSoundChar = 6'd13;           // D
+          endcase
+        end
+        else begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = DEBUG_CH_M;
+            3'd1: debugSoundChar = DEBUG_CH_P;
+            3'd2: debugSoundChar = DEBUG_CH_N;
+            3'd3: debugSoundChar = DEBUG_CH_H;
+            3'd4: debugSoundChar = DEBUG_CH_T;
+            3'd5: debugSoundChar = 6'd0;
+            3'd6: debugSoundChar = 6'd1;
+            default: debugSoundChar = 6'd2;
+          endcase
+        end
       end
       3'd2: begin
-        case (debugTextRow)
-          3'd0: debugSoundChar = 6'd13;         // D
-          3'd1: debugSoundChar = DEBUG_CH_L;
-          3'd2: debugSoundChar = DEBUG_CH_K;
-          3'd3: debugSoundChar = DEBUG_CH_R;
-          3'd4: debugSoundChar = 6'd10;         // A
-          default: debugSoundChar = DEBUG_CH_SPACE;
-        endcase
+        if (io_debug_view == 3'd5) begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = DEBUG_CH_L;
+            3'd1: debugSoundChar = 6'd10;       // A
+            3'd2: debugSoundChar = DEBUG_CH_H;
+            3'd3: debugSoundChar = DEBUG_CH_M;
+            3'd4: debugSoundChar = DEBUG_CH_L;
+            3'd5: debugSoundChar = DEBUG_CH_H;
+            3'd6: debugSoundChar = DEBUG_CH_M;
+            default: debugSoundChar = DEBUG_CH_L;
+          endcase
+        end
+        else begin
+          case (debugTextRow)
+            3'd0: debugSoundChar = 6'd13;       // D
+            3'd1: debugSoundChar = DEBUG_CH_L;
+            3'd2: debugSoundChar = DEBUG_CH_K;
+            3'd3: debugSoundChar = DEBUG_CH_R;
+            3'd4: debugSoundChar = 6'd10;       // A
+            default: debugSoundChar = DEBUG_CH_SPACE;
+          endcase
+        end
       end
-      3'd4: debugSoundChar = {2'b00, debugSoundByte[7:4]};
-      3'd5: debugSoundChar = {2'b00, debugSoundByte[3:0]};
+      3'd4: debugSoundChar = {2'b00, debugTextByte[7:4]};
+      3'd5: debugSoundChar = {2'b00, debugTextByte[3:0]};
       default: debugSoundChar = DEBUG_CH_SPACE;
     endcase
   end
@@ -436,7 +472,7 @@ module CaveDebugOverlay(
 
   wire       debugTextGlyphOn =
     debugPanel &
-    (io_debug_view == 3'd7) &
+    ((io_debug_view == 3'd5) | (io_debug_view == 3'd7)) &
     (debugTextCol < 3'd6) &
     (io_video_pos_x[4:0] < 5'd20) &
     (io_video_pos_y[4:0] < 5'd28) &
@@ -448,7 +484,8 @@ module CaveDebugOverlay(
 
   assign io_rgb =
     !debugPanel ? 24'h000010 :
-    io_debug_view == 3'd7 ? (debugTextGlyphOn ? 24'hf8f8d8 : debugTextBg) :
+    ((io_debug_view == 3'd5) | (io_debug_view == 3'd7))
+      ? (debugTextGlyphOn ? 24'hf8f8d8 : debugTextBg) :
     debugGrid    ? 24'h202020 :
     debugCellOn  ? debugRowRgb :
                    debugOffRgb;

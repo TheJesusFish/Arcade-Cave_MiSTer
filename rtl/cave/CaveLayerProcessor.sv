@@ -31,6 +31,7 @@ module CaveLayerProcessor #(
   input  [8:0]  io_video_regs_size_y,
   input  [8:0]  io_spriteOffset_x,
   input  [8:0]  io_spriteOffset_y,
+  input         io_direct6bppPixels,
   output [1:0]  io_pen_priority,
   output [5:0]  io_pen_palette,
   output [7:0]  io_pen_color
@@ -113,6 +114,14 @@ module CaveLayerProcessor #(
   wire [7:0] pixel6bpp_5 = {2'b00, pixel8bpp_5[7:6], pixel8bpp_5[3:0]};
   wire [7:0] pixel6bpp_6 = {2'b00, pixel8bpp_6[7:6], pixel8bpp_6[3:0]};
   wire [7:0] pixel6bpp_7 = {2'b00, pixel8bpp_7[7:6], pixel8bpp_7[3:0]};
+  wire [7:0] pixel6bppDirect_0 = io_ctrl_tileRom_dout[63:56];
+  wire [7:0] pixel6bppDirect_1 = io_ctrl_tileRom_dout[55:48];
+  wire [7:0] pixel6bppDirect_2 = io_ctrl_tileRom_dout[47:40];
+  wire [7:0] pixel6bppDirect_3 = io_ctrl_tileRom_dout[39:32];
+  wire [7:0] pixel6bppDirect_4 = io_ctrl_tileRom_dout[31:24];
+  wire [7:0] pixel6bppDirect_5 = io_ctrl_tileRom_dout[23:16];
+  wire [7:0] pixel6bppDirect_6 = io_ctrl_tileRom_dout[15:8];
+  wire [7:0] pixel6bppDirect_7 = io_ctrl_tileRom_dout[7:0];
 
   reg [7:0] penColor;
   reg [25:0] tileRomAddr;
@@ -183,35 +192,35 @@ module CaveLayerProcessor #(
       pixReg_0 <=
         format8bpp
           ? pixel8bpp_0
-          : format6bpp ? pixel6bpp_0 : {4'h0, pixels4bppBits[31:28]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_0 : pixel6bpp_0) : {4'h0, pixels4bppBits[31:28]};
       pixReg_1 <=
         format8bpp
           ? pixel8bpp_1
-          : format6bpp ? pixel6bpp_1 : {4'h0, pixels4bppBits[27:24]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_1 : pixel6bpp_1) : {4'h0, pixels4bppBits[27:24]};
       pixReg_2 <=
         format8bpp
           ? pixel8bpp_2
-          : format6bpp ? pixel6bpp_2 : {4'h0, pixels4bppBits[23:20]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_2 : pixel6bpp_2) : {4'h0, pixels4bppBits[23:20]};
       pixReg_3 <=
         format8bpp
           ? pixel8bpp_3
-          : format6bpp ? pixel6bpp_3 : {4'h0, pixels4bppBits[19:16]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_3 : pixel6bpp_3) : {4'h0, pixels4bppBits[19:16]};
       pixReg_4 <=
         format8bpp
           ? pixel8bpp_4
-          : format6bpp ? pixel6bpp_4 : {4'h0, pixels4bppBits[15:12]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_4 : pixel6bpp_4) : {4'h0, pixels4bppBits[15:12]};
       pixReg_5 <=
         format8bpp
           ? pixel8bpp_5
-          : format6bpp ? pixel6bpp_5 : {4'h0, pixels4bppBits[11:8]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_5 : pixel6bpp_5) : {4'h0, pixels4bppBits[11:8]};
       pixReg_6 <=
         format8bpp
           ? pixel8bpp_6
-          : format6bpp ? pixel6bpp_6 : {4'h0, pixels4bppBits[7:4]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_6 : pixel6bpp_6) : {4'h0, pixels4bppBits[7:4]};
       pixReg_7 <=
         format8bpp
           ? pixel8bpp_7
-          : format6bpp ? pixel6bpp_7 : {4'h0, pixels4bppBits[3:0]};
+          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_7 : pixel6bpp_7) : {4'h0, pixels4bppBits[3:0]};
     end
   end
 

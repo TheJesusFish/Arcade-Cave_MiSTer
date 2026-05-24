@@ -196,8 +196,14 @@ module MemSys(
   wire [15:0] layerRomCache2OutDout;
   wire        layerRomCache2OutWaitN;
   wire        layerRomCache2OutValid;
+  wire        layerRomCache2InRd;
+  wire [31:0] layerRomCache2InAddr;
+  wire [63:0] layerRomCache2InDout;
+  wire        layerRomCache2InWaitN;
+  wire        layerRomCache2InValid;
 
   wire        gameIsMazinger;
+  wire        gameIsAirGallet;
   wire        copyDmaStart = io_prog_done & ~copyDmaStartedReg;
   wire        decryptDmaStart = copyDmaDoneReg & gameIsMazinger & ~decryptDmaStartedReg;
   wire [31:0] ddrDownloadAddr = ddrDownloadBufferOutAddr + IOCTL_DOWNLOAD_BASE_ADDR;
@@ -234,6 +240,7 @@ module MemSys(
     .game_is_gaia                (),
     .game_is_hotdogstorm         (),
     .game_is_mazinger            (gameIsMazinger),
+    .game_is_airgallet           (gameIsAirGallet),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (),
@@ -470,16 +477,32 @@ module MemSys(
     .clock         (clock),
     .reset         (reset),
     .io_enable     (readyEnableReg),
-    .io_in_rd      (io_layerTileRom_2_rd),
-    .io_in_addr    (io_layerTileRom_2_addr),
-    .io_in_dout    (io_layerTileRom_2_dout),
-    .io_in_wait_n  (io_layerTileRom_2_wait_n),
-    .io_in_valid   (io_layerTileRom_2_valid),
+    .io_in_rd      (layerRomCache2InRd),
+    .io_in_addr    (layerRomCache2InAddr),
+    .io_in_dout    (layerRomCache2InDout),
+    .io_in_wait_n  (layerRomCache2InWaitN),
+    .io_in_valid   (layerRomCache2InValid),
     .io_out_rd     (layerRomCache2OutRd),
     .io_out_addr   (layerRomCache2OutAddr),
     .io_out_dout   (layerRomCache2OutDout),
     .io_out_wait_n (layerRomCache2OutWaitN),
     .io_out_valid  (layerRomCache2OutValid)
+  );
+
+  AirGalletLayer2TileRomAdapter airGalletLayer2TileRomAdapter (
+    .clock           (clock),
+    .reset           (reset),
+    .game_active     (gameIsAirGallet),
+    .io_in_rd        (io_layerTileRom_2_rd),
+    .io_in_addr      (io_layerTileRom_2_addr),
+    .io_in_dout      (io_layerTileRom_2_dout),
+    .io_in_wait_n    (io_layerTileRom_2_wait_n),
+    .io_in_valid     (io_layerTileRom_2_valid),
+    .io_cache_rd     (layerRomCache2InRd),
+    .io_cache_addr   (layerRomCache2InAddr),
+    .io_cache_dout   (layerRomCache2InDout),
+    .io_cache_wait_n (layerRomCache2InWaitN),
+    .io_cache_valid  (layerRomCache2InValid)
   );
 
   CaveMainDdrArbiter ddrArbiter (
