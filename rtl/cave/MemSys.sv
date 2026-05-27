@@ -10,6 +10,8 @@ module MemSys(
   input  [31:0] io_gameConfig_layer_1_romOffset,
   input  [31:0] io_gameConfig_layer_2_romOffset,
   input  [31:0] io_gameConfig_sprite_romOffset,
+  input  [31:0] io_gameConfig_sprite_romSize,
+  input  [2:0]  io_gameConfig_sprite_descrambleStyle,
   input         io_prog_rom_wr,
   input  [26:0] io_prog_rom_addr,
   input  [15:0] io_prog_rom_din,
@@ -23,10 +25,15 @@ module MemSys(
   output        io_prog_nvram_valid,
   input         io_prog_done,
   input         io_progRom_rd,
-  input  [19:0] io_progRom_addr,
+  input  [21:0] io_progRom_addr,
   output [15:0] io_progRom_dout,
   output        io_progRom_wait_n,
   output        io_progRom_valid,
+  input         io_highProgRom_rd,
+  input  [21:0] io_highProgRom_addr,
+  output [15:0] io_highProgRom_dout,
+  output        io_highProgRom_wait_n,
+  output        io_highProgRom_valid,
   input         io_eeprom_rd,
   input         io_eeprom_wr,
   input  [6:0]  io_eeprom_addr,
@@ -103,6 +110,7 @@ module MemSys(
 );
   localparam [31:0] IOCTL_DOWNLOAD_BASE_ADDR = 32'h3000_0000;
   localparam [31:0] MAZINGER_SPRITE_DECRYPT_OFFSET = 32'h0100_0000;
+  localparam [31:0] AIR_GALLET_SPRITE_DESCRAMBLE_OFFSET = 32'h0400_0000;
 
   reg readyEnableReg;
   reg copyDmaBusyReg;
@@ -111,6 +119,8 @@ module MemSys(
   reg decryptDmaBusyReg;
   reg decryptDmaStartedReg;
   reg decryptDmaDoneReg;
+  reg airSpriteDescrambleStartedReg;
+  reg airSpriteDescrambleDoneReg;
 
   wire        ddrDownloadBufferOutWr;
   wire [31:0] ddrDownloadBufferOutAddr;
@@ -148,12 +158,28 @@ module MemSys(
   wire [7:0]  decryptDmaBurstLength;
   wire        decryptDmaBurstDone;
   wire        decryptDmaDone = ~decryptDmaBusy & decryptDmaBusyReg;
+  wire        airSpriteDescrambleDone;
+  wire        airSpriteDescrambleInRd;
+  wire [31:0] airSpriteDescrambleInAddr;
+  wire [63:0] airSpriteDescrambleInDout;
+  wire        airSpriteDescrambleInWaitN;
+  wire        airSpriteDescrambleInValid;
+  wire        airSpriteDescrambleInBurstDone;
+  wire        airSpriteDescrambleOutWr;
+  wire [31:0] airSpriteDescrambleOutAddr;
+  wire [63:0] airSpriteDescrambleOutDin;
+  wire        airSpriteDescrambleOutWaitN;
 
   wire        progRomCacheOutRd;
   wire [24:0] progRomCacheOutAddr;
   wire [15:0] progRomCacheOutDout;
   wire        progRomCacheOutWaitN;
   wire        progRomCacheOutValid;
+  wire        highProgRomCacheOutRd;
+  wire [24:0] highProgRomCacheOutAddr;
+  wire [15:0] highProgRomCacheOutDout;
+  wire        highProgRomCacheOutWaitN;
+  wire        highProgRomCacheOutValid;
 
   wire        eepromCacheInRd;
   wire        eepromCacheInWr;
@@ -206,17 +232,40 @@ module MemSys(
   wire        gameIsAirGallet;
   wire        copyDmaStart = io_prog_done & ~copyDmaStartedReg;
   wire        decryptDmaStart = copyDmaDoneReg & gameIsMazinger & ~decryptDmaStartedReg;
+  wire        doAirSpriteDescramble =
+    gameIsAirGallet & (io_gameConfig_sprite_descrambleStyle != 3'h0);
+  wire        airSpriteDescrambleStart =
+    copyDmaDone & doAirSpriteDescramble & ~airSpriteDescrambleStartedReg;
+  wire        spriteSetupDone =
+    gameIsMazinger ? decryptDmaDoneReg :
+    (doAirSpriteDescramble ? airSpriteDescrambleDoneReg : 1'b1);
   wire [31:0] ddrDownloadAddr = ddrDownloadBufferOutAddr + IOCTL_DOWNLOAD_BASE_ADDR;
   wire [31:0] ddrCopyDmaAddr = copyDmaInAddr + IOCTL_DOWNLOAD_BASE_ADDR;
   wire [31:0] spriteRomReadOffset =
-    gameIsMazinger ? MAZINGER_SPRITE_DECRYPT_OFFSET : io_gameConfig_sprite_romOffset;
+    gameIsMazinger ? MAZINGER_SPRITE_DECRYPT_OFFSET :
+    (doAirSpriteDescramble ? AIR_GALLET_SPRITE_DESCRAMBLE_OFFSET : io_gameConfig_sprite_romOffset);
   wire [31:0] spriteTileRomLocalAddr =
     gameIsMazinger ? {10'h000, io_spriteTileRom_addr[21:0]} : io_spriteTileRom_addr;
   wire [31:0] ddrSpriteTileRomAddr =
     spriteTileRomLocalAddr + (spriteRomReadOffset + IOCTL_DOWNLOAD_BASE_ADDR);
+  wire        ddrAux5Rd = doAirSpriteDescramble ? airSpriteDescrambleInRd : decryptDmaRd;
+  wire        ddrAux5Wr = doAirSpriteDescramble ? 1'b0 : decryptDmaWr;
+  wire [31:0] ddrAux5Addr = doAirSpriteDescramble ?
+    (airSpriteDescrambleInAddr + io_gameConfig_sprite_romOffset + IOCTL_DOWNLOAD_BASE_ADDR) :
+    decryptDmaAddr;
+  wire [7:0]  ddrAux5Mask = doAirSpriteDescramble ? 8'h00 : decryptDmaMask;
+  wire [63:0] ddrAux5Din = doAirSpriteDescramble ? 64'h0 : decryptDmaDin;
+  wire [63:0] ddrAux5Dout;
+  wire        ddrAux5WaitN;
+  wire        ddrAux5Valid;
+  wire [7:0]  ddrAux5BurstLength = doAirSpriteDescramble ? 8'd1 : decryptDmaBurstLength;
+  wire        ddrAux5BurstDone;
+  wire [31:0] airSpriteDescrambleDdrOutAddr =
+    airSpriteDescrambleOutAddr + AIR_GALLET_SPRITE_DESCRAMBLE_OFFSET + IOCTL_DOWNLOAD_BASE_ADDR;
 
   wire [24:0] eepromSdramAddr =
     eepromCacheOutAddr + io_gameConfig_eepromOffset[24:0];
+  wire [24:0] highProgRomSdramAddr = highProgRomCacheOutAddr;
   wire [24:0] soundRom0SdramAddr =
     soundRomCache0OutAddr + io_gameConfig_sound_0_romOffset[24:0];
   wire [24:0] soundRom1SdramAddr =
@@ -259,6 +308,8 @@ module MemSys(
       decryptDmaBusyReg <= 1'b0;
       decryptDmaStartedReg <= 1'b0;
       decryptDmaDoneReg <= 1'b0;
+      airSpriteDescrambleStartedReg <= 1'b0;
+      airSpriteDescrambleDoneReg <= 1'b0;
     end
     else begin
       if (copyDmaStart)
@@ -269,9 +320,13 @@ module MemSys(
         decryptDmaStartedReg <= 1'b1;
       if (decryptDmaDone)
         decryptDmaDoneReg <= 1'b1;
+      if (airSpriteDescrambleStart)
+        airSpriteDescrambleStartedReg <= 1'b1;
+      if (airSpriteDescrambleDone)
+        airSpriteDescrambleDoneReg <= 1'b1;
 
       readyEnableReg <=
-        readyEnableReg | (copyDmaDoneReg & (~gameIsMazinger | decryptDmaDoneReg));
+        readyEnableReg | (copyDmaDoneReg & spriteSetupDone);
     end
   end
 
@@ -337,12 +392,40 @@ module MemSys(
     .io_mem_burstDone     (decryptDmaBurstDone)
   );
 
+  assign decryptDmaDout = ddrAux5Dout;
+  assign decryptDmaWaitN = ddrAux5WaitN;
+  assign decryptDmaValid = ddrAux5Valid;
+  assign decryptDmaBurstDone = ddrAux5BurstDone;
+  assign airSpriteDescrambleInDout = ddrAux5Dout;
+  assign airSpriteDescrambleInWaitN = ddrAux5WaitN;
+  assign airSpriteDescrambleInValid = ddrAux5Valid;
+  assign airSpriteDescrambleInBurstDone = ddrAux5BurstDone;
+
+  AirGalletSpriteDescrambleDMA airGalletSpriteDescrambleDma (
+    .clock                                  (clock),
+    .reset                                  (reset),
+    .io_start                               (airSpriteDescrambleStart),
+    .io_done                                (airSpriteDescrambleDone),
+    .io_gameConfig_sprite_romSize           (io_gameConfig_sprite_romSize),
+    .io_gameConfig_sprite_descrambleStyle   (io_gameConfig_sprite_descrambleStyle),
+    .io_in_rd                               (airSpriteDescrambleInRd),
+    .io_in_addr                             (airSpriteDescrambleInAddr),
+    .io_in_dout                             (airSpriteDescrambleInDout),
+    .io_in_wait_n                           (airSpriteDescrambleInWaitN),
+    .io_in_valid                            (airSpriteDescrambleInValid),
+    .io_in_burstDone                        (airSpriteDescrambleInBurstDone),
+    .io_out_wr                              (airSpriteDescrambleOutWr),
+    .io_out_addr                            (airSpriteDescrambleOutAddr),
+    .io_out_din                             (airSpriteDescrambleOutDin),
+    .io_out_wait_n                          (airSpriteDescrambleOutWaitN)
+  );
+
   CaveReadCache #(
-    .IN_ADDR_WIDTH  (20),
+    .IN_ADDR_WIDTH  (22),
     .IN_DATA_WIDTH  (16),
     .OUT_ADDR_WIDTH (25),
     .INDEX_WIDTH    (7),
-    .TAG_WIDTH      (11)
+    .TAG_WIDTH      (13)
   ) progRomCache (
     .clock         (clock),
     .reset         (reset),
@@ -357,6 +440,28 @@ module MemSys(
     .io_out_dout   (progRomCacheOutDout),
     .io_out_wait_n (progRomCacheOutWaitN),
     .io_out_valid  (progRomCacheOutValid)
+  );
+
+  CaveReadCache #(
+    .IN_ADDR_WIDTH  (22),
+    .IN_DATA_WIDTH  (16),
+    .OUT_ADDR_WIDTH (25),
+    .INDEX_WIDTH    (7),
+    .TAG_WIDTH      (13)
+  ) highProgRomCache (
+    .clock         (clock),
+    .reset         (reset),
+    .io_enable     (readyEnableReg),
+    .io_in_rd      (io_highProgRom_rd),
+    .io_in_addr    (io_highProgRom_addr),
+    .io_in_dout    (io_highProgRom_dout),
+    .io_in_wait_n  (io_highProgRom_wait_n),
+    .io_in_valid   (io_highProgRom_valid),
+    .io_out_rd     (highProgRomCacheOutRd),
+    .io_out_addr   (highProgRomCacheOutAddr),
+    .io_out_dout   (highProgRomCacheOutDout),
+    .io_out_wait_n (highProgRomCacheOutWaitN),
+    .io_out_valid  (highProgRomCacheOutValid)
   );
 
   CaveNvramWriteBackCache eepromCache (
@@ -489,21 +594,11 @@ module MemSys(
     .io_out_valid  (layerRomCache2OutValid)
   );
 
-  AirGalletLayer2TileRomAdapter airGalletLayer2TileRomAdapter (
-    .clock           (clock),
-    .reset           (reset),
-    .game_active     (gameIsAirGallet),
-    .io_in_rd        (io_layerTileRom_2_rd),
-    .io_in_addr      (io_layerTileRom_2_addr),
-    .io_in_dout      (io_layerTileRom_2_dout),
-    .io_in_wait_n    (io_layerTileRom_2_wait_n),
-    .io_in_valid     (io_layerTileRom_2_valid),
-    .io_cache_rd     (layerRomCache2InRd),
-    .io_cache_addr   (layerRomCache2InAddr),
-    .io_cache_dout   (layerRomCache2InDout),
-    .io_cache_wait_n (layerRomCache2InWaitN),
-    .io_cache_valid  (layerRomCache2InValid)
-  );
+  assign layerRomCache2InRd = io_layerTileRom_2_rd;
+  assign layerRomCache2InAddr = io_layerTileRom_2_addr;
+  assign io_layerTileRom_2_dout = layerRomCache2InDout;
+  assign io_layerTileRom_2_wait_n = layerRomCache2InWaitN;
+  assign io_layerTileRom_2_valid = layerRomCache2InValid;
 
   CaveMainDdrArbiter ddrArbiter (
     .clock               (clock),
@@ -540,16 +635,20 @@ module MemSys(
     .io_in_4_valid       (io_spriteTileRom_valid),
     .io_in_4_burstLength (io_spriteTileRom_burstLength),
     .io_in_4_burstDone   (io_spriteTileRom_burstDone),
-    .io_in_5_rd          (decryptDmaRd),
-    .io_in_5_wr          (decryptDmaWr),
-    .io_in_5_addr        (decryptDmaAddr),
-    .io_in_5_mask        (decryptDmaMask),
-    .io_in_5_din         (decryptDmaDin),
-    .io_in_5_dout        (decryptDmaDout),
-    .io_in_5_wait_n      (decryptDmaWaitN),
-    .io_in_5_valid       (decryptDmaValid),
-    .io_in_5_burstLength (decryptDmaBurstLength),
-    .io_in_5_burstDone   (decryptDmaBurstDone),
+    .io_in_5_rd          (ddrAux5Rd),
+    .io_in_5_wr          (ddrAux5Wr),
+    .io_in_5_addr        (ddrAux5Addr),
+    .io_in_5_mask        (ddrAux5Mask),
+    .io_in_5_din         (ddrAux5Din),
+    .io_in_5_dout        (ddrAux5Dout),
+    .io_in_5_wait_n      (ddrAux5WaitN),
+    .io_in_5_valid       (ddrAux5Valid),
+    .io_in_5_burstLength (ddrAux5BurstLength),
+    .io_in_5_burstDone   (ddrAux5BurstDone),
+    .io_in_6_wr          (airSpriteDescrambleOutWr),
+    .io_in_6_addr        (airSpriteDescrambleDdrOutAddr),
+    .io_in_6_din         (airSpriteDescrambleOutDin),
+    .io_in_6_wait_n      (airSpriteDescrambleOutWaitN),
     .io_out_rd           (io_ddr_rd),
     .io_out_wr           (io_ddr_wr),
     .io_out_addr         (io_ddr_addr),
@@ -575,6 +674,11 @@ module MemSys(
     .io_in_1_dout      (progRomCacheOutDout),
     .io_in_1_wait_n    (progRomCacheOutWaitN),
     .io_in_1_valid     (progRomCacheOutValid),
+    .io_in_8_rd        (highProgRomCacheOutRd),
+    .io_in_8_addr      (highProgRomSdramAddr),
+    .io_in_8_dout      (highProgRomCacheOutDout),
+    .io_in_8_wait_n    (highProgRomCacheOutWaitN),
+    .io_in_8_valid     (highProgRomCacheOutValid),
     .io_in_2_rd        (eepromCacheOutRd),
     .io_in_2_wr        (eepromCacheOutWr),
     .io_in_2_addr      (eepromSdramAddr),

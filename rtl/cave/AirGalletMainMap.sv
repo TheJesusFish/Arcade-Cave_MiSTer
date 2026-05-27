@@ -7,6 +7,7 @@ module AirGalletMainMap(
   input         read_strobe,
   input         write_strobe,
   input         prog_rom_valid,
+  input         extra_rom_valid,
   input         dtack_reg,
   input         agallet_irq,
   input         unknown_irq,
@@ -21,9 +22,11 @@ module AirGalletMainMap(
   input  [15:0] layer1_vram8_data,
   input  [15:0] layer2_vram8_data,
   input  [15:0] sound_data,
+  input  [15:0] sprite_regs_stub_data,
   input  [15:0] sprite_ram_data,
   input  [15:0] work_ram_data,
   input  [15:0] main_ram_data,
+  input  [15:0] extra_rom_data,
   input  [15:0] prog_rom_data,
   output [23:0] cpu_byte_addr,
   output        prog_rom_select,
@@ -50,6 +53,7 @@ module AirGalletMainMap(
   output        irq_read,
   output [1:0]  irq_word_offset,
   output        sprite_swap_write,
+  output        sprite_regs_stub_write,
   output        sync_dtack,
   output        cycle,
   output        unmapped_cycle,
@@ -83,12 +87,14 @@ module AirGalletMainMap(
   wire        eepromSelect;
   wire        irqSelect;
   wire        soundSelect;
+  wire        spriteRegsStubRead;
   wire        progRomAccess;
+  wire        extraRomReady;
   wire        knownSelect;
   wire        dataStrobe;
 
   wire [15:0] irqCause =
-    {13'h0, ~((irq_word_offset == 2'h0) & agallet_irq), ~unknown_irq, ~video_irq};
+    {13'h0, ~((irq_word_offset == 2'h0) & agallet_irq), 1'b1, ~video_irq};
 
   AirGalletMainDecoder decoder(
     .game_active         (game_active),
@@ -99,6 +105,7 @@ module AirGalletMainMap(
     .read_strobe         (read_strobe),
     .write_strobe        (write_strobe),
     .prog_rom_valid      (prog_rom_valid),
+    .extra_rom_valid     (extra_rom_valid),
     .dtack_reg           (dtack_reg),
     .cpu_byte_addr       (cpu_byte_addr),
     .prog_rom_select     (prog_rom_select),
@@ -122,6 +129,8 @@ module AirGalletMainMap(
     .layer1_regs_select  (layer1_regs_select),
     .layer2_regs_select  (layer2_regs_select),
     .sprite_regs_select  (),
+    .sprite_regs_stub_read  (spriteRegsStubRead),
+    .sprite_regs_stub_write (sprite_regs_stub_write),
     .irq_select          (irqSelect),
     .irq_read            (irq_read),
     .irq_word_offset     (irq_word_offset),
@@ -132,6 +141,7 @@ module AirGalletMainMap(
     .sprite_swap_write   (sprite_swap_write),
     .prog_rom_access     (progRomAccess),
     .prog_rom_ready      (prog_rom_ready),
+    .extra_rom_ready     (extraRomReady),
     .sync_dtack          (sync_dtack),
     .cycle               (cycle),
     .known_select        (knownSelect),
@@ -177,7 +187,7 @@ module AirGalletMainMap(
     .sprite_ram_select   (sprite_ram_select),
     .work_ram_select     (work_ram_select),
     .main_ram_select     (main_ram_select),
-    .extra_rom_read      (extra_rom_select & read_strobe),
+    .extra_rom_ready     (extraRomReady),
     .prog_rom_ready      (prog_rom_ready),
     .open_bus_read       (open_bus_select & read_strobe),
     .input1_data         (input1_data),
@@ -191,10 +201,13 @@ module AirGalletMainMap(
     .layer2_vram8_data   (layer2_vram8_data),
     .sound_flags_data    (sound_data == 16'h00ff ? 16'h0002 : 16'h0000),
     .sound_data          (sound_data),
+    .sprite_regs_stub_read (spriteRegsStubRead),
+    .sprite_regs_stub_data (sprite_regs_stub_data),
     .irq_data            (irqCause),
     .sprite_ram_data     (sprite_ram_data),
     .work_ram_data       (work_ram_data),
     .main_ram_data       (main_ram_data),
+    .extra_rom_data      (extra_rom_data),
     .prog_rom_data       (prog_rom_data),
     .valid               (read_data_valid),
     .data                (read_data)

@@ -8,8 +8,8 @@ This project contains the MiSTer core for Cave's first-generation 68000 arcade h
 
 ## Supported Games
 
-| Title                                                                                                                 | Status        |
-|-----------------------------------------------------------------------------------------------------------------------|---------------|
+| Title                                                                                                                 | Status        | Notes                                  |
+|-----------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------
 | [**DoDonpachi**](https://en.wikipedia.org/wiki/DoDonPachi)                                                            | Public        |
 | [**ESP Ra. De.**](https://en.wikipedia.org/wiki/ESP_Ra.De.)                                                           | Public        |
 | [**Dangun Feveron**](https://en.wikipedia.org/wiki/Dangun_Feveron)                                                    | Public        |
@@ -19,14 +19,14 @@ This project contains the MiSTer core for Cave's first-generation 68000 arcade h
 | [**Thunder Heroes**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=theroes&arcade_only=0&autosearch=1)     | Public        |
 | [**Donpachi**](https://en.wikipedia.org/wiki/DonPachi)                                                                | Public        |
 | [**Air Gallet**](https://en.wikipedia.org/wiki/Air_Gallet)                                                            | WIP           |
-| [**Hotdog Storm**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=hotdogst&arcade_only=0&autosearch=1)      | WIP           |
-| [**Koro Koro Quest**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=korokoro&arcade_only=0&autosearch=1)   | Unimplemented |
-| [**Mazinger Z**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=mazinger&arcade_only=0&autosearch=1)        | Public        |
+| [**Hotdog Storm**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=hotdogst&arcade_only=0&autosearch=1)      | WIP           | Screen tearing
+| [**Mazinger Z**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=mazinger&arcade_only=0&autosearch=1)        | WIP           | Minor graphical issues
+| [**Pretty Soldier Sailor Moon**](https://en.wikipedia.org/wiki/Pretty_Soldier_Sailor_Moon_(arcade_game))              | Unimplemented |
 | [**Gogetsuji Legends**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=plegends&arcade_only=0&autosearch=1) | Unimplemented |
 | [**Power Instinct 2**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=pwrinst2&arcade_only=0&autosearch=1)  | Unimplemented |
 | [**Saikyou Densetsu**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=plegendsj&arcade_only=0&autosearch=1) | Unimplemented |
-| [**Pretty Soldier Sailor Moon**](https://en.wikipedia.org/wiki/Pretty_Soldier_Sailor_Moon_(arcade_game))              | Unimplemented |
 | [**The Ninja Master**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=metmqstr&arcade_only=0&autosearch=1)  | Unimplemented |
+| [**Koro Koro Quest**](http://adb.arcadeitalia.net/dettaglio_mame.php?game_name=korokoro&arcade_only=0&autosearch=1)   | Unimplemented |
 
 ## Credits
 

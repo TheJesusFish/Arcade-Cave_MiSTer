@@ -1,7 +1,7 @@
 module SpriteDecoder(
   input         clock,
   input         reset,
-  input  [1:0]  io_format,
+  input  [2:0]  io_format,
   output        io_tileRom_ready,
   input         io_tileRom_valid,
   input  [63:0] io_tileRom_bits,
@@ -29,8 +29,8 @@ module SpriteDecoder(
   reg          toggleReg;
   reg  [127:0] dataReg;
 
-  wire format4bppMsb = io_format == 2'h2;
-  wire format8bpp = &io_format;
+  wire format4bppMsb = io_format == 3'h2;
+  wire format8bpp = io_format == 3'h3;
 
   wire start = io_pixelData_ready & ~pendingReg;
   wire tileRomFire = pendingReg & io_tileRom_valid;

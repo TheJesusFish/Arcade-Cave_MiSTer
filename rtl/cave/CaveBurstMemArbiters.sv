@@ -43,6 +43,10 @@ module CaveMainDdrArbiter(
   output        io_in_5_valid,
   input  [7:0]  io_in_5_burstLength,
   output        io_in_5_burstDone,
+  input         io_in_6_wr,
+  input  [31:0] io_in_6_addr,
+  input  [63:0] io_in_6_din,
+  output        io_in_6_wait_n,
   output        io_out_rd,
   output        io_out_wr,
   output [31:0] io_out_addr,
@@ -55,16 +59,17 @@ module CaveMainDdrArbiter(
   input         io_out_burstDone
 );
 
-  localparam [5:0] REQ_NONE = 6'b000000;
-  localparam [5:0] REQ_0    = 6'b000001;
-  localparam [5:0] REQ_1    = 6'b000010;
-  localparam [5:0] REQ_2    = 6'b000100;
-  localparam [5:0] REQ_3    = 6'b001000;
-  localparam [5:0] REQ_4    = 6'b010000;
-  localparam [5:0] REQ_5    = 6'b100000;
+  localparam [6:0] REQ_NONE = 7'b0000000;
+  localparam [6:0] REQ_0    = 7'b0000001;
+  localparam [6:0] REQ_1    = 7'b0000010;
+  localparam [6:0] REQ_2    = 7'b0000100;
+  localparam [6:0] REQ_3    = 7'b0001000;
+  localparam [6:0] REQ_4    = 7'b0010000;
+  localparam [6:0] REQ_5    = 7'b0100000;
+  localparam [6:0] REQ_6    = 7'b1000000;
 
   reg        busy_reg;
-  reg [5:0]  locked_request;
+  reg [6:0]  locked_request;
 
   wire request_0 = io_in_0_wr;
   wire request_1 = io_in_1_rd;
@@ -72,24 +77,26 @@ module CaveMainDdrArbiter(
   wire request_3 = io_in_3_rd | io_in_3_wr;
   wire request_4 = io_in_4_rd;
   wire request_5 = io_in_5_rd | io_in_5_wr;
+  wire request_6 = io_in_6_wr;
 
-  wire [5:0] next_request =
+  wire [6:0] next_request =
     request_0 ? REQ_0 :
     request_1 ? REQ_1 :
     request_5 ? REQ_5 :
+    request_6 ? REQ_6 :
     request_2 ? REQ_2 :
     request_3 ? REQ_3 :
     request_4 ? REQ_4 :
     REQ_NONE;
 
-  wire [5:0] chosen = busy_reg ? locked_request : next_request;
+  wire [6:0] chosen = busy_reg ? locked_request : next_request;
   wire       no_request_chosen = chosen == REQ_NONE;
   wire       selected_read =
     (chosen[1] & io_in_1_rd) | (chosen[3] & io_in_3_rd) | (chosen[4] & io_in_4_rd)
     | (chosen[5] & io_in_5_rd);
   wire       selected_write =
     (chosen[0] & io_in_0_wr) | (chosen[2] & io_in_2_wr) | (chosen[3] & io_in_3_wr)
-    | (chosen[5] & io_in_5_wr);
+    | (chosen[5] & io_in_5_wr) | (chosen[6] & io_in_6_wr);
   wire       effective_request = ~busy_reg & (selected_read | selected_write) & io_out_wait_n;
 
   always @(posedge clock) begin
@@ -122,6 +129,7 @@ module CaveMainDdrArbiter(
   assign io_in_5_wait_n = (no_request_chosen | chosen[5]) & io_out_wait_n;
   assign io_in_5_valid = chosen[5] & io_out_valid;
   assign io_in_5_burstDone = chosen[5] & io_out_burstDone;
+  assign io_in_6_wait_n = (no_request_chosen | chosen[6]) & io_out_wait_n;
   assign io_out_rd = selected_read;
   assign io_out_wr = selected_write;
   assign io_out_addr =
@@ -130,24 +138,28 @@ module CaveMainDdrArbiter(
     (chosen[2] ? io_in_2_addr : 32'h0) |
     (chosen[3] ? io_in_3_addr : 32'h0) |
     (chosen[4] ? io_in_4_addr : 32'h0) |
-    (chosen[5] ? io_in_5_addr : 32'h0);
+    (chosen[5] ? io_in_5_addr : 32'h0) |
+    (chosen[6] ? io_in_6_addr : 32'h0);
   assign io_out_mask =
     {8{chosen[0]}} |
     (chosen[2] ? io_in_2_mask : 8'h0) |
     (chosen[3] ? io_in_3_mask : 8'h0) |
-    (chosen[5] ? io_in_5_mask : 8'h0);
+    (chosen[5] ? io_in_5_mask : 8'h0) |
+    (chosen[6] ? 8'hff : 8'h0);
   assign io_out_din =
     (chosen[0] ? io_in_0_din : 64'h0) |
     (chosen[2] ? io_in_2_din : 64'h0) |
     (chosen[3] ? io_in_3_din : 64'h0) |
-    (chosen[5] ? io_in_5_din : 64'h0);
+    (chosen[5] ? io_in_5_din : 64'h0) |
+    (chosen[6] ? io_in_6_din : 64'h0);
   assign io_out_burstLength =
     (chosen[0] ? 8'd1 : 8'd0) |
     (chosen[1] ? 8'd16 : 8'd0) |
     (chosen[2] ? 8'd1 : 8'd0) |
     (chosen[3] ? io_in_3_burstLength : 8'd0) |
     (chosen[4] ? io_in_4_burstLength : 8'd0) |
-    (chosen[5] ? io_in_5_burstLength : 8'd0);
+    (chosen[5] ? io_in_5_burstLength : 8'd0) |
+    (chosen[6] ? 8'd1 : 8'd0);
 endmodule
 
 module CaveMainSdramArbiter(
@@ -163,6 +175,11 @@ module CaveMainSdramArbiter(
   output [15:0] io_in_1_dout,
   output        io_in_1_wait_n,
   output        io_in_1_valid,
+  input         io_in_8_rd,
+  input  [24:0] io_in_8_addr,
+  output [15:0] io_in_8_dout,
+  output        io_in_8_wait_n,
+  output        io_in_8_valid,
   input         io_in_2_rd,
   input         io_in_2_wr,
   input  [24:0] io_in_2_addr,
@@ -205,18 +222,19 @@ module CaveMainSdramArbiter(
   input         io_out_burstDone
 );
 
-  localparam [7:0] REQ_NONE = 8'b00000000;
-  localparam [7:0] REQ_0    = 8'b00000001;
-  localparam [7:0] REQ_1    = 8'b00000010;
-  localparam [7:0] REQ_2    = 8'b00000100;
-  localparam [7:0] REQ_3    = 8'b00001000;
-  localparam [7:0] REQ_4    = 8'b00010000;
-  localparam [7:0] REQ_5    = 8'b00100000;
-  localparam [7:0] REQ_6    = 8'b01000000;
-  localparam [7:0] REQ_7    = 8'b10000000;
+  localparam [8:0] REQ_NONE = 9'b000000000;
+  localparam [8:0] REQ_0    = 9'b000000001;
+  localparam [8:0] REQ_1    = 9'b000000010;
+  localparam [8:0] REQ_2    = 9'b000000100;
+  localparam [8:0] REQ_3    = 9'b000001000;
+  localparam [8:0] REQ_4    = 9'b000010000;
+  localparam [8:0] REQ_5    = 9'b000100000;
+  localparam [8:0] REQ_6    = 9'b001000000;
+  localparam [8:0] REQ_7    = 9'b010000000;
+  localparam [8:0] REQ_8    = 9'b100000000;
 
   reg        busy_reg;
-  reg [7:0]  locked_request;
+  reg [8:0]  locked_request;
 
   wire request_0 = io_in_0_wr;
   wire request_1 = io_in_1_rd;
@@ -226,10 +244,12 @@ module CaveMainSdramArbiter(
   wire request_5 = io_in_5_rd;
   wire request_6 = io_in_6_rd;
   wire request_7 = io_in_7_rd;
+  wire request_8 = io_in_8_rd;
 
-  wire [7:0] next_request =
+  wire [8:0] next_request =
     request_0 ? REQ_0 :
     request_1 ? REQ_1 :
+    request_8 ? REQ_8 :
     request_2 ? REQ_2 :
     request_3 ? REQ_3 :
     request_4 ? REQ_4 :
@@ -238,7 +258,7 @@ module CaveMainSdramArbiter(
     request_7 ? REQ_7 :
     REQ_NONE;
 
-  wire [7:0] chosen = busy_reg ? locked_request : next_request;
+  wire [8:0] chosen = busy_reg ? locked_request : next_request;
   wire       no_request_chosen = chosen == REQ_NONE;
   wire       selected_read =
     (chosen[1] & io_in_1_rd) |
@@ -247,7 +267,8 @@ module CaveMainSdramArbiter(
     (chosen[4] & io_in_4_rd) |
     (chosen[5] & io_in_5_rd) |
     (chosen[6] & io_in_6_rd) |
-    (chosen[7] & io_in_7_rd);
+    (chosen[7] & io_in_7_rd) |
+    (chosen[8] & io_in_8_rd);
   wire       selected_write = (chosen[0] & io_in_0_wr) | (chosen[2] & io_in_2_wr);
   wire       effective_request = ~busy_reg & (selected_read | selected_write) & io_out_wait_n;
 
@@ -268,6 +289,9 @@ module CaveMainSdramArbiter(
   assign io_in_1_dout = io_out_dout;
   assign io_in_1_wait_n = (no_request_chosen | chosen[1]) & io_out_wait_n;
   assign io_in_1_valid = chosen[1] & io_out_valid;
+  assign io_in_8_dout = io_out_dout;
+  assign io_in_8_wait_n = (no_request_chosen | chosen[8]) & io_out_wait_n;
+  assign io_in_8_valid = chosen[8] & io_out_valid;
   assign io_in_2_dout = io_out_dout;
   assign io_in_2_wait_n = (no_request_chosen | chosen[2]) & io_out_wait_n;
   assign io_in_2_valid = chosen[2] & io_out_valid;
@@ -296,7 +320,8 @@ module CaveMainSdramArbiter(
     (chosen[4] ? io_in_4_addr : 25'h0) |
     (chosen[5] ? io_in_5_addr : 25'h0) |
     (chosen[6] ? io_in_6_addr : 25'h0) |
-    (chosen[7] ? io_in_7_addr : 25'h0);
+    (chosen[7] ? io_in_7_addr : 25'h0) |
+    (chosen[8] ? io_in_8_addr : 25'h0);
   assign io_out_din =
     (chosen[0] ? io_in_0_din : 16'h0) |
     (chosen[2] ? io_in_2_din : 16'h0);

@@ -11,10 +11,11 @@ module AirGalletMainReadMux(
   input         sound_flags_read,
   input         sound_read,
   input         irq_read,
+  input         sprite_regs_stub_read,
   input         sprite_ram_select,
   input         work_ram_select,
   input         main_ram_select,
-  input         extra_rom_read,
+  input         extra_rom_ready,
   input         prog_rom_ready,
   input         open_bus_read,
   input  [15:0] input1_data,
@@ -29,9 +30,11 @@ module AirGalletMainReadMux(
   input  [15:0] sound_flags_data,
   input  [15:0] sound_data,
   input  [15:0] irq_data,
+  input  [15:0] sprite_regs_stub_data,
   input  [15:0] sprite_ram_data,
   input  [15:0] work_ram_data,
   input  [15:0] main_ram_data,
+  input  [15:0] extra_rom_data,
   input  [15:0] prog_rom_data,
   output reg    valid,
   output reg [15:0] data
@@ -62,14 +65,16 @@ module AirGalletMainReadMux(
       data = sound_data;
     else if (irq_read)
       data = irq_data;
+    else if (sprite_regs_stub_read)
+      data = sprite_regs_stub_data;
     else if (sprite_ram_select)
       data = sprite_ram_data;
     else if (work_ram_select)
       data = work_ram_data;
     else if (main_ram_select)
       data = main_ram_data;
-    else if (extra_rom_read)
-      data = 16'h0000;
+    else if (extra_rom_ready)
+      data = extra_rom_data;
     else if (prog_rom_ready)
       data = prog_rom_data;
     else if (open_bus_read)

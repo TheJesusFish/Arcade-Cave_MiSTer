@@ -9,7 +9,6 @@ MazingerMainMap.sv
 AirGalletMainDecoder.sv
 AirGalletMainReadMux.sv
 AirGalletMainMap.sv
-AirGalletLayer2TileRomAdapter.sv
 CaveBurstBuffers.sv
 CaveBurstMemArbiters.sv
 CaveDualClockFIFO.sv
@@ -28,6 +27,7 @@ DDR.sv
 SDRAM.sv
 CaveBurstDMAs.sv
 MazingerSpriteDecryptDMA.sv
+AirGalletSpriteDescrambleDMA.sv
 CaveReadCache.sv
 CaveNvramWriteBackCache.sv
 CaveAsyncMemArbiters.sv

@@ -3,7 +3,7 @@ module SpriteProcessor(
   input          clock,
   input          reset,
   input          io_ctrl_enable,
-  input  [1:0]   io_ctrl_format,
+  input  [2:0]   io_ctrl_format,
   input          io_ctrl_start,
   input          io_ctrl_zoom,
   input  [1:0]   io_ctrl_regs_bank,
@@ -93,7 +93,7 @@ module SpriteProcessor(
   wire [7:0]  blitterPixelData15;
 
   wire spriteEnabled = (|spriteReg_cols) & (|spriteReg_rows);
-  wire is8bpp = &io_ctrl_format;
+  wire is8bpp = io_ctrl_format == 3'h3;
   wire [5:0] tileRomBurstLength = is8bpp ? 6'h20 : 6'h10;
   wire [3:0] tileRomAddrShift = is8bpp ? 4'h8 : 4'h7;
   wire [17:0] tileRomTileIndex = spriteReg_code + {2'b00, tileCounter};

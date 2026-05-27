@@ -1,13 +1,15 @@
-module CaveProgramRomReadFreezer(
+module CaveProgramRomReadFreezer #(
+  parameter ADDR_WIDTH = 20
+) (
   input         clock,
   input         reset,
   input         io_targetClock,
   input         io_in_rd,
-  input  [19:0] io_in_addr,
+  input  [ADDR_WIDTH-1:0] io_in_addr,
   output [15:0] io_in_dout,
   output        io_in_valid,
   output        io_out_rd,
-  output [19:0] io_out_addr,
+  output [ADDR_WIDTH-1:0] io_out_addr,
   input  [15:0] io_out_dout,
   input         io_out_wait_n,
   input         io_out_valid

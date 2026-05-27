@@ -23,6 +23,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AudioMixer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AudioPipeline.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveBurstDMAs.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/MazingerSpriteDecryptDMA.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AirGalletSpriteDescrambleDMA.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveBurstBuffers.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveBurstMemArbiters.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveBoardProfile.sv
@@ -35,7 +36,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/MazingerMainMap.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AirGalletMainDecoder.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AirGalletMainReadMux.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AirGalletMainMap.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/AirGalletLayer2TileRomAdapter.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveDualClockFIFO.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveGameConfig.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveLayerProcessor.sv

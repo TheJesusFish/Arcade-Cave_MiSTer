@@ -79,6 +79,7 @@ module Main(
   output [127:0] io_gpuMem_sprite_vram_dout,
   input  [14:0]  io_gpuMem_paletteRam_addr,
   output [15:0]  io_gpuMem_paletteRam_dout,
+  output         io_tileBank,
   output         io_soundCtrl_oki_0_wr,
   output [15:0]  io_soundCtrl_oki_0_din,
   input  [15:0]  io_soundCtrl_oki_0_dout,
@@ -99,9 +100,13 @@ module Main(
   input  [15:0]  io_soundCtrl_reply,
   input          io_soundCtrl_irq,
   output         io_progRom_rd,
-  output [19:0]  io_progRom_addr,
+  output [21:0]  io_progRom_addr,
   input  [15:0]  io_progRom_dout,
   input          io_progRom_valid,
+  output         io_highProgRom_rd,
+  output [21:0]  io_highProgRom_addr,
+  input  [15:0]  io_highProgRom_dout,
+  input          io_highProgRom_valid,
   output         io_eeprom_rd,
   output         io_eeprom_wr,
   output [6:0]   io_eeprom_addr,
@@ -509,20 +514,22 @@ module Main(
   wire        airGalletPaletteRead;
   wire        airGalletPaletteWrite;
   wire        airGalletSpriteRegsWrite;
+  wire        airGalletSpriteRegsStubWrite;
   wire        airGalletCpuSpace;
   wire        airGalletOpenBusSelect;
   wire        airGalletDtack;
   wire        airGalletReadDataValid;
   wire [15:0] airGalletReadData;
 
-  wire [14:0] airGalletTilemapOffset = cpuByteAddr[14:0];
-  wire        airGalletTilemapVram16 = airGalletTilemapOffset < 15'h1000;
+  wire [15:0] airGalletTilemapOffset = airGalletCpuByteAddr[15:0];
+  wire        airGalletTilemapVram16 = airGalletTilemapOffset < 16'h1000;
   wire        airGalletTilemapLine =
-    (airGalletTilemapOffset >= 15'h1000) & (airGalletTilemapOffset < 15'h1800);
+    (airGalletTilemapOffset >= 16'h1000) & (airGalletTilemapOffset < 16'h1800);
   wire        airGalletTilemapScratch =
-    (airGalletTilemapOffset >= 15'h1800) & (airGalletTilemapOffset < 15'h4000);
-  wire        airGalletTilemapVram8 = airGalletTilemapOffset >= 15'h4000;
-  wire [12:0] airGalletTilemapScratchAddr = airGalletTilemapOffset[13:1] - 13'h0c00;
+    (airGalletTilemapOffset >= 16'h1800) & (airGalletTilemapOffset < 16'h4000);
+  wire        airGalletTilemapVram8 =
+    (airGalletTilemapOffset >= 16'h4000) & (airGalletTilemapOffset < 16'h8000);
+  wire        airGalletTilemapStub = airGalletTilemapOffset >= 16'h8000;
   wire        airGalletLayer0Vram16Read = airGalletLayer0Vram8Read & airGalletTilemapVram16;
   wire        airGalletLayer0Vram16Write = airGalletLayer0Vram8Write & airGalletTilemapVram16;
   wire        airGalletLayer0LineRead = airGalletLayer0Vram8Read & airGalletTilemapLine;
@@ -547,28 +554,55 @@ module Main(
   wire        airGalletLayer2ScratchWrite = airGalletLayer2Vram8Write & airGalletTilemapScratch;
   wire        airGalletLayer2Vram8OnlyRead = airGalletLayer2Vram8Read & airGalletTilemapVram8;
   wire        airGalletLayer2Vram8OnlyWrite = airGalletLayer2Vram8Write & airGalletTilemapVram8;
-  wire [15:0] airGalletLayer0ScratchData;
-  wire [15:0] airGalletLayer1ScratchData;
-  wire [15:0] airGalletLayer2ScratchData;
+  reg  [15:0] airGalletLayer0ScratchReg;
+  reg  [15:0] airGalletLayer1ScratchReg;
+  reg  [15:0] airGalletLayer2ScratchReg;
+  reg  [15:0] airGalletLayer0StubReg;
+  reg  [15:0] airGalletLayer1StubReg;
+  reg  [15:0] airGalletLayer2StubReg;
   wire [15:0] airGalletLayer0VramData =
     airGalletTilemapVram16 ? _vram16x16_0_io_portA_dout :
     airGalletTilemapLine   ? _lineRam_0_io_portA_dout :
-    airGalletTilemapScratch ? airGalletLayer0ScratchData :
+    airGalletTilemapScratch ? airGalletLayer0ScratchReg :
     airGalletTilemapVram8  ? _vram8x8_0_io_portA_dout :
+    airGalletTilemapStub   ? airGalletLayer0StubReg :
     16'h0000;
   wire [15:0] airGalletLayer1VramData =
     airGalletTilemapVram16 ? _vram16x16_1_io_portA_dout :
     airGalletTilemapLine   ? _lineRam_1_io_portA_dout :
-    airGalletTilemapScratch ? airGalletLayer1ScratchData :
+    airGalletTilemapScratch ? airGalletLayer1ScratchReg :
     airGalletTilemapVram8  ? _vram8x8_1_io_portA_dout :
+    airGalletTilemapStub   ? airGalletLayer1StubReg :
     16'h0000;
   wire [15:0] airGalletLayer2VramData =
     airGalletTilemapVram16 ? _vram16x16_2_io_portA_dout :
     airGalletTilemapLine   ? _lineRam_2_io_portA_dout :
-    airGalletTilemapScratch ? airGalletLayer2ScratchData :
+    airGalletTilemapScratch ? airGalletLayer2ScratchReg :
     airGalletTilemapVram8  ? _vram8x8_2_io_portA_dout :
+    airGalletTilemapStub   ? airGalletLayer2StubReg :
     16'h0000;
-  wire [15:0] airGalletWorkRamData;
+  wire        airGalletWorkStub0 = (airGalletCpuByteAddr >= 24'h400000) & (airGalletCpuByteAddr < 24'h408000);
+  wire        airGalletWorkStub1 = (airGalletCpuByteAddr >= 24'h40c000) & (airGalletCpuByteAddr < 24'h410000);
+  wire        airGalletWorkStub2 = (airGalletCpuByteAddr >= 24'h110000) & (airGalletCpuByteAddr < 24'h110002);
+  wire        airGalletWorkStub3 = (airGalletCpuByteAddr >= 24'h410000) & (airGalletCpuByteAddr < 24'h410002);
+  wire        airGalletWorkStub4 = (airGalletCpuByteAddr >= 24'h510000) & (airGalletCpuByteAddr < 24'h510002);
+  reg  [15:0] airGalletWorkStub0Reg;
+  reg  [15:0] airGalletWorkStub1Reg;
+  reg  [15:0] airGalletWorkStub2Reg;
+  reg  [15:0] airGalletWorkStub3Reg;
+  reg  [15:0] airGalletWorkStub4Reg;
+  reg  [15:0] airGalletSpriteRegsStubReg;
+  wire [15:0] airGalletUnusedWorkRamData;
+  wire [15:0] airGalletWorkRamData =
+    airGalletWorkStub0 ? airGalletWorkStub0Reg :
+    airGalletWorkStub1 ? airGalletWorkStub1Reg :
+    airGalletWorkStub2 ? airGalletWorkStub2Reg :
+    airGalletWorkStub3 ? airGalletWorkStub3Reg :
+    airGalletWorkStub4 ? airGalletWorkStub4Reg :
+    16'h0000;
+  reg         tileBankReg;
+
+  assign io_tileBank = tileBankReg;
 
   assign airGalletVideoIrqClear =
     gameIsAirGallet & airGalletIrqRead & (airGalletIrqWordOffset == 2'h2);
@@ -722,6 +756,7 @@ module Main(
     .read_strobe          (readStrobe),
     .write_strobe         (writeStrobe),
     .prog_rom_valid       (io_progRom_valid),
+    .extra_rom_valid      (io_highProgRom_valid),
     .dtack_reg            (dtackReg),
     .agallet_irq          (agalletIrq),
     .unknown_irq          (unknownIrq),
@@ -736,9 +771,11 @@ module Main(
     .layer1_vram8_data    (airGalletLayer1VramData),
     .layer2_vram8_data    (airGalletLayer2VramData),
     .sound_data           (io_soundCtrl_reply),
+    .sprite_regs_stub_data (airGalletSpriteRegsStubReg),
     .sprite_ram_data      (_spriteRam_io_portA_dout),
     .work_ram_data        (airGalletWorkRamData),
     .main_ram_data        (_mainRam_io_dout),
+    .extra_rom_data       (io_highProgRom_dout),
     .prog_rom_data        (io_progRom_dout),
     .cpu_byte_addr        (airGalletCpuByteAddr),
     .prog_rom_select      (airGalletProgRomSelect),
@@ -765,6 +802,7 @@ module Main(
     .irq_read             (airGalletIrqRead),
     .irq_word_offset      (airGalletIrqWordOffset),
     .sprite_swap_write    (airGalletSpriteSwapWrite),
+    .sprite_regs_stub_write (airGalletSpriteRegsStubWrite),
     .sync_dtack           (airGalletSyncDtack),
     .cycle                (airGalletCycle),
     .unmapped_cycle       (airGalletUnmappedCycle),
@@ -1017,9 +1055,9 @@ module Main(
 
   wire [7:0] airGalletDebugPipelineRow0 = {
     airGalletCpuByteAddr != airGalletDebugPrevAddr,
-    airGalletProgRomReady,
-    io_progRom_valid,
-    io_progRom_rd,
+    airGalletProgRomReady | (airGalletExtraRomSelect & io_highProgRom_valid),
+    io_progRom_valid | io_highProgRom_valid,
+    io_progRom_rd | io_highProgRom_rd,
     airGalletDtack,
     writeStrobe,
     readStrobe,
@@ -1112,7 +1150,7 @@ module Main(
     io_gpuMem_layer_1_regs_r_1_tileSize,
     io_gpuMem_layer_0_regs_r_1_enable,
     io_gpuMem_layer_0_regs_r_1_tileSize,
-    airGalletTilemapVram8,
+    airGalletTilemapVram8 | airGalletTilemapStub,
     airGalletTilemapVram16 | airGalletTilemapLine | airGalletTilemapScratch
   };
   wire [63:0] airGalletDebugEventBits = {
@@ -2236,8 +2274,49 @@ module Main(
       unknownIrq <= 1'h0;
       dinReg <= 16'h0;
       dtackReg <= 1'h0;
+      tileBankReg <= 1'b0;
+      airGalletLayer0ScratchReg <= 16'h0000;
+      airGalletLayer1ScratchReg <= 16'h0000;
+      airGalletLayer2ScratchReg <= 16'h0000;
+      airGalletLayer0StubReg <= 16'h0000;
+      airGalletLayer1StubReg <= 16'h0000;
+      airGalletLayer2StubReg <= 16'h0000;
+      airGalletWorkStub0Reg <= 16'h0000;
+      airGalletWorkStub1Reg <= 16'h0000;
+      airGalletWorkStub2Reg <= 16'h0000;
+      airGalletWorkStub3Reg <= 16'h0000;
+      airGalletWorkStub4Reg <= 16'h0000;
+      airGalletSpriteRegsStubReg <= 16'h0000;
     end
     else begin
+      if (eepromMem_wr)
+        // Air Gallet uses Zakk's slot-8 board map; the EEPROM-driven layer
+        // bank latch belongs to his Sailor Moon slot.
+        tileBankReg <= 1'b0;
+      if (airGalletWorkRamWrite & airGalletWorkStub0)
+        airGalletWorkStub0Reg <= _cpu_io_dout;
+      if (airGalletWorkRamWrite & airGalletWorkStub1)
+        airGalletWorkStub1Reg <= _cpu_io_dout;
+      if (airGalletWorkRamWrite & airGalletWorkStub2)
+        airGalletWorkStub2Reg <= _cpu_io_dout;
+      if (airGalletWorkRamWrite & airGalletWorkStub3)
+        airGalletWorkStub3Reg <= _cpu_io_dout;
+      if (airGalletWorkRamWrite & airGalletWorkStub4)
+        airGalletWorkStub4Reg <= _cpu_io_dout;
+      if (airGalletSpriteRegsStubWrite)
+        airGalletSpriteRegsStubReg <= _cpu_io_dout;
+      if (airGalletLayer0ScratchWrite)
+        airGalletLayer0ScratchReg <= _cpu_io_dout;
+      if (airGalletLayer1ScratchWrite)
+        airGalletLayer1ScratchReg <= _cpu_io_dout;
+      if (airGalletLayer2ScratchWrite)
+        airGalletLayer2ScratchReg <= _cpu_io_dout;
+      if (airGalletLayer0Vram8Write & airGalletTilemapStub)
+        airGalletLayer0StubReg <= _cpu_io_dout;
+      if (airGalletLayer1Vram8Write & airGalletTilemapStub)
+        airGalletLayer1StubReg <= _cpu_io_dout;
+      if (airGalletLayer2Vram8Write & airGalletTilemapStub)
+        airGalletLayer2StubReg <= _cpu_io_dout;
       videoIrq <=
         gameIsAirGallet
           ? (videoIrq | videoVBlankRising) & ~airGalletVideoIrqClear
@@ -4573,28 +4652,28 @@ module Main(
           mazingerDebugExtraChecksumValid <= 1'b1;
       end
       if (mazingerProgRomReady) begin
-        mazingerDebugLastProgAddr <= {4'h0, io_progRom_addr};
+        mazingerDebugLastProgAddr <= {2'h0, io_progRom_addr};
         case (io_progRom_addr)
-          20'h001D94:
+          22'h001D94:
             mazingerDebugMilestones[0] <= 1'b1;
-          20'h001E62:
+          22'h001E62:
             mazingerDebugMilestones[2] <= 1'b1;
-          20'h001F5E:
+          22'h001F5E:
             mazingerDebugMilestones[3] <= 1'b1;
-          20'h002064:
+          22'h002064:
             mazingerDebugMilestones[4] <= 1'b1;
-          20'h0020A8:
+          22'h0020A8:
             mazingerDebugMilestones[5] <= 1'b1;
-          20'h006EA8, 20'h006EAA:
+          22'h006EA8, 22'h006EAA:
             mazingerDebugMilestones[6] <= 1'b1;
           default: begin
           end
         endcase
         case (io_progRom_addr)
-          20'h00000: mazingerDebugVector0 <= io_progRom_dout;
-          20'h00002: mazingerDebugVector1 <= io_progRom_dout;
-          20'h00004: mazingerDebugVector2 <= io_progRom_dout;
-          20'h00006: mazingerDebugVector3 <= io_progRom_dout;
+          22'h00000: mazingerDebugVector0 <= io_progRom_dout;
+          22'h00002: mazingerDebugVector1 <= io_progRom_dout;
+          22'h00004: mazingerDebugVector2 <= io_progRom_dout;
+          22'h00006: mazingerDebugVector3 <= io_progRom_dout;
           default: begin
           end
         endcase
@@ -4641,8 +4720,12 @@ module Main(
         airGalletDebugLastDin <= dinReg;
 
       if (io_progRom_rd & io_progRom_valid) begin
-        airGalletDebugLastProgAddr <= {4'h0, io_progRom_addr};
+        airGalletDebugLastProgAddr <= {2'h0, io_progRom_addr};
         airGalletDebugMilestones[0] <= 1'b1;
+      end
+      if (io_highProgRom_rd & io_highProgRom_valid) begin
+        airGalletDebugLastProgAddr <= {2'h0, io_highProgRom_addr};
+        airGalletDebugMilestones[7] <= 1'b1;
       end
       if (airGalletSoundWrite)
         airGalletDebugMilestones[1] <= 1'b1;
@@ -4723,7 +4806,11 @@ module Main(
     io_gpuMem_layer_2_regs_r_1_scroll_y <= io_gpuMem_layer_2_regs_r_scroll_y;
   end // always @(posedge)
   assign _cpu_io_vpa = _cpu_io_as & (&_cpu_io_fc);
-  assign _cpu_io_ipl = {2'h0, videoIrq | io_soundCtrl_irq | unknownIrq};
+  assign _cpu_io_ipl = {
+    2'h0,
+    gameIsAirGallet ? (videoIrq | io_soundCtrl_irq)
+                    : (videoIrq | io_soundCtrl_irq | unknownIrq)
+  };
   CaveMain68kCpu cpu (
     .clock    (clock),
     .reset    (mazingerCpuReset),
@@ -4782,49 +4869,7 @@ module Main(
     .addr  (airGalletWorkRamAddr),
     .mask  (mainRam_io_mask),
     .din   (_cpu_io_dout),
-    .dout  (airGalletWorkRamData)
-  );
-  CaveSinglePortRam #(
-    .ADDR_WIDTH  (13),
-    .DATA_WIDTH  (16),
-    .DEPTH       (5120),
-    .MASK_ENABLE (1)
-  ) airGalletLayer0ScratchRam (
-    .clock (clock),
-    .rd    (airGalletLayer0ScratchRead),
-    .wr    (airGalletLayer0ScratchWrite),
-    .addr  (airGalletTilemapScratchAddr),
-    .mask  (mainRam_io_mask),
-    .din   (_cpu_io_dout),
-    .dout  (airGalletLayer0ScratchData)
-  );
-  CaveSinglePortRam #(
-    .ADDR_WIDTH  (13),
-    .DATA_WIDTH  (16),
-    .DEPTH       (5120),
-    .MASK_ENABLE (1)
-  ) airGalletLayer1ScratchRam (
-    .clock (clock),
-    .rd    (airGalletLayer1ScratchRead),
-    .wr    (airGalletLayer1ScratchWrite),
-    .addr  (airGalletTilemapScratchAddr),
-    .mask  (mainRam_io_mask),
-    .din   (_cpu_io_dout),
-    .dout  (airGalletLayer1ScratchData)
-  );
-  CaveSinglePortRam #(
-    .ADDR_WIDTH  (13),
-    .DATA_WIDTH  (16),
-    .DEPTH       (5120),
-    .MASK_ENABLE (1)
-  ) airGalletLayer2ScratchRam (
-    .clock (clock),
-    .rd    (airGalletLayer2ScratchRead),
-    .wr    (airGalletLayer2ScratchWrite),
-    .addr  (airGalletTilemapScratchAddr),
-    .mask  (mainRam_io_mask),
-    .din   (_cpu_io_dout),
-    .dout  (airGalletLayer2ScratchData)
+    .dout  (airGalletUnusedWorkRamData)
   );
   assign _spriteRam_io_portA_addr = _cpu_io_addr[14:0];
   CaveTrueDualPortRam #(
@@ -5200,9 +5245,13 @@ module Main(
       : gameIsMazinger ? mazingerProgRomRead
       : gameIsUopoko ? cs_214 & readStrobe : _GEN_189;
   assign io_progRom_addr =
-    (gameIsMazinger & mazingerExtraRomSelect)
-      ? {1'b1, cpuByteAddr[18:0]}
-      : {_cpu_io_addr[18:0], 1'h0};
+    gameIsAirGallet
+      ? airGalletCpuByteAddr[21:0]
+      : (gameIsMazinger & mazingerExtraRomSelect)
+        ? {2'b00, 1'b1, cpuByteAddr[18:0]}
+        : {2'b00, _cpu_io_addr[18:0], 1'h0};
+  assign io_highProgRom_rd = gameIsAirGallet & airGalletExtraRomSelect & readStrobe;
+  assign io_highProgRom_addr = gameIsAirGallet ? airGalletCpuByteAddr[21:0] : 22'h000000;
   assign io_spriteFrameBufferSwap =
     gameIsAirGallet ? airGalletSpriteSwapWrite
       : gameIsMazinger ? videoVBlankRising

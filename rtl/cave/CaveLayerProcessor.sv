@@ -5,7 +5,7 @@ module CaveLayerProcessor #(
 ) (
   input         clock,
   input         io_ctrl_enable,
-  input  [1:0]  io_ctrl_format,
+  input  [2:0]  io_ctrl_format,
   input         io_ctrl_regs_tileSize,
   input         io_ctrl_regs_enable,
   input         io_ctrl_regs_flipX,
@@ -31,7 +31,7 @@ module CaveLayerProcessor #(
   input  [8:0]  io_video_regs_size_y,
   input  [8:0]  io_spriteOffset_x,
   input  [8:0]  io_spriteOffset_y,
-  input         io_direct6bppPixels,
+  input         io_ctrl_tileBank,
   output [1:0]  io_pen_priority,
   output [5:0]  io_pen_palette,
   output [7:0]  io_pen_color
@@ -92,10 +92,11 @@ module CaveLayerProcessor #(
       ? {2'b00, effectivePosY[8:4], largeColumn}
       : {effectivePosY[8:3], smallColumn};
 
-  wire format4bpp = io_ctrl_format == 2'h1;
-  wire format6bpp = io_ctrl_format == 2'h2;
-  wire format8bpp = &io_ctrl_format;
-  wire formatLinearTile = format6bpp | format8bpp;
+  wire format4bpp = io_ctrl_format == 3'h1;
+  wire format8bpp = io_ctrl_format == 3'h3;
+  wire format6bpp2 = io_ctrl_format == 3'h4;
+  wire format6bpp = io_ctrl_format == 3'h5;
+  wire formatLinearTile = format6bpp | format6bpp2 | format8bpp;
   wire [31:0] pixels4bppBits =
     tileOffset_y[0] ? io_ctrl_tileRom_dout[31:0] : io_ctrl_tileRom_dout[63:32];
   wire [7:0] pixel8bpp_0 = {io_ctrl_tileRom_dout[55:52], io_ctrl_tileRom_dout[63:60]};
@@ -114,14 +115,23 @@ module CaveLayerProcessor #(
   wire [7:0] pixel6bpp_5 = {2'b00, pixel8bpp_5[7:6], pixel8bpp_5[3:0]};
   wire [7:0] pixel6bpp_6 = {2'b00, pixel8bpp_6[7:6], pixel8bpp_6[3:0]};
   wire [7:0] pixel6bpp_7 = {2'b00, pixel8bpp_7[7:6], pixel8bpp_7[3:0]};
-  wire [7:0] pixel6bppDirect_0 = io_ctrl_tileRom_dout[63:56];
-  wire [7:0] pixel6bppDirect_1 = io_ctrl_tileRom_dout[55:48];
-  wire [7:0] pixel6bppDirect_2 = io_ctrl_tileRom_dout[47:40];
-  wire [7:0] pixel6bppDirect_3 = io_ctrl_tileRom_dout[39:32];
-  wire [7:0] pixel6bppDirect_4 = io_ctrl_tileRom_dout[31:24];
-  wire [7:0] pixel6bppDirect_5 = io_ctrl_tileRom_dout[23:16];
-  wire [7:0] pixel6bppDirect_6 = io_ctrl_tileRom_dout[15:8];
-  wire [7:0] pixel6bppDirect_7 = io_ctrl_tileRom_dout[7:0];
+  // Air Gallet's layer 2 MRA interleaves a 4bpp source with a packed 2bpp source.
+  wire [7:0] pixel6bpp2_0 =
+    {2'b00, io_ctrl_tileRom_dout[49:48], io_ctrl_tileRom_dout[63:62], io_ctrl_tileRom_dout[61:60]};
+  wire [7:0] pixel6bpp2_1 =
+    {2'b00, io_ctrl_tileRom_dout[51:50], io_ctrl_tileRom_dout[59:58], io_ctrl_tileRom_dout[57:56]};
+  wire [7:0] pixel6bpp2_2 =
+    {2'b00, io_ctrl_tileRom_dout[37:36], io_ctrl_tileRom_dout[47:46], io_ctrl_tileRom_dout[45:44]};
+  wire [7:0] pixel6bpp2_3 =
+    {2'b00, io_ctrl_tileRom_dout[39:38], io_ctrl_tileRom_dout[43:42], io_ctrl_tileRom_dout[41:40]};
+  wire [7:0] pixel6bpp2_4 =
+    {2'b00, io_ctrl_tileRom_dout[17:16], io_ctrl_tileRom_dout[31:30], io_ctrl_tileRom_dout[29:28]};
+  wire [7:0] pixel6bpp2_5 =
+    {2'b00, io_ctrl_tileRom_dout[19:18], io_ctrl_tileRom_dout[27:26], io_ctrl_tileRom_dout[25:24]};
+  wire [7:0] pixel6bpp2_6 =
+    {2'b00, io_ctrl_tileRom_dout[5:4],   io_ctrl_tileRom_dout[15:14], io_ctrl_tileRom_dout[13:12]};
+  wire [7:0] pixel6bpp2_7 =
+    {2'b00, io_ctrl_tileRom_dout[7:6],   io_ctrl_tileRom_dout[11:10], io_ctrl_tileRom_dout[9:8]};
 
   reg [7:0] penColor;
   reg [25:0] tileRomAddr;
@@ -148,6 +158,8 @@ module CaveLayerProcessor #(
       tileRomAddr = {1'b0, tileReg_code, tileOffset_y[3], ~tileOffset_x[3], tileOffset_y[2:1], 3'b000};
     if (~io_ctrl_regs_tileSize & formatLinearTile)
       tileRomAddr = {2'b00, tileReg_code, tileOffset_y[2:0], 3'b000};
+    if (~io_ctrl_regs_tileSize & format6bpp2 & io_ctrl_tileBank & (tileReg_code < 18'h10000))
+      tileRomAddr = {1'b0, 1'b1, tileReg_code, tileOffset_y[2:0], 3'b000};
     if (~io_ctrl_regs_tileSize & format4bpp)
       tileRomAddr = {3'b000, tileReg_code, tileOffset_y[2:1], 3'b000};
   end
@@ -192,35 +204,35 @@ module CaveLayerProcessor #(
       pixReg_0 <=
         format8bpp
           ? pixel8bpp_0
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_0 : pixel6bpp_0) : {4'h0, pixels4bppBits[31:28]};
+          : format6bpp2 ? pixel6bpp2_0 : format6bpp ? pixel6bpp_0 : {4'h0, pixels4bppBits[31:28]};
       pixReg_1 <=
         format8bpp
           ? pixel8bpp_1
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_1 : pixel6bpp_1) : {4'h0, pixels4bppBits[27:24]};
+          : format6bpp2 ? pixel6bpp2_1 : format6bpp ? pixel6bpp_1 : {4'h0, pixels4bppBits[27:24]};
       pixReg_2 <=
         format8bpp
           ? pixel8bpp_2
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_2 : pixel6bpp_2) : {4'h0, pixels4bppBits[23:20]};
+          : format6bpp2 ? pixel6bpp2_2 : format6bpp ? pixel6bpp_2 : {4'h0, pixels4bppBits[23:20]};
       pixReg_3 <=
         format8bpp
           ? pixel8bpp_3
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_3 : pixel6bpp_3) : {4'h0, pixels4bppBits[19:16]};
+          : format6bpp2 ? pixel6bpp2_3 : format6bpp ? pixel6bpp_3 : {4'h0, pixels4bppBits[19:16]};
       pixReg_4 <=
         format8bpp
           ? pixel8bpp_4
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_4 : pixel6bpp_4) : {4'h0, pixels4bppBits[15:12]};
+          : format6bpp2 ? pixel6bpp2_4 : format6bpp ? pixel6bpp_4 : {4'h0, pixels4bppBits[15:12]};
       pixReg_5 <=
         format8bpp
           ? pixel8bpp_5
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_5 : pixel6bpp_5) : {4'h0, pixels4bppBits[11:8]};
+          : format6bpp2 ? pixel6bpp2_5 : format6bpp ? pixel6bpp_5 : {4'h0, pixels4bppBits[11:8]};
       pixReg_6 <=
         format8bpp
           ? pixel8bpp_6
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_6 : pixel6bpp_6) : {4'h0, pixels4bppBits[7:4]};
+          : format6bpp2 ? pixel6bpp2_6 : format6bpp ? pixel6bpp_6 : {4'h0, pixels4bppBits[7:4]};
       pixReg_7 <=
         format8bpp
           ? pixel8bpp_7
-          : format6bpp ? (io_direct6bppPixels ? pixel6bppDirect_7 : pixel6bpp_7) : {4'h0, pixels4bppBits[3:0]};
+          : format6bpp2 ? pixel6bpp2_7 : format6bpp ? pixel6bpp_7 : {4'h0, pixels4bppBits[3:0]};
     end
   end
 

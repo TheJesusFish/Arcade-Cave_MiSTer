@@ -7,6 +7,7 @@ module AirGalletMainDecoder(
   input         read_strobe,
   input         write_strobe,
   input         prog_rom_valid,
+  input         extra_rom_valid,
   input         dtack_reg,
   output [23:0] cpu_byte_addr,
   output        prog_rom_select,
@@ -30,6 +31,8 @@ module AirGalletMainDecoder(
   output        layer1_regs_select,
   output        layer2_regs_select,
   output        sprite_regs_select,
+  output        sprite_regs_stub_read,
+  output        sprite_regs_stub_write,
   output        irq_select,
   output        irq_read,
   output [1:0]  irq_word_offset,
@@ -40,6 +43,7 @@ module AirGalletMainDecoder(
   output        sprite_swap_write,
   output        prog_rom_access,
   output        prog_rom_ready,
+  output        extra_rom_ready,
   output        sync_dtack,
   output        cycle,
   output        known_select,
@@ -78,24 +82,21 @@ module AirGalletMainDecoder(
   wire work_ram_1_select =
     (cpu_byte_addr >= 24'h40c000) & (cpu_byte_addr < 24'h410000);
   wire work_ram_110_select =
-    (cpu_byte_addr >= 24'h110000) & (cpu_byte_addr < 24'h110004);
+    (cpu_byte_addr >= 24'h110000) & (cpu_byte_addr < 24'h110002);
   wire work_ram_410_select =
-    (cpu_byte_addr >= 24'h410000) & (cpu_byte_addr < 24'h410004);
+    (cpu_byte_addr >= 24'h410000) & (cpu_byte_addr < 24'h410002);
   wire work_ram_510_select =
-    (cpu_byte_addr >= 24'h510000) & (cpu_byte_addr < 24'h510004);
-  wire work_ram_908_select =
-    (cpu_byte_addr >= 24'h908000) & (cpu_byte_addr < 24'h908004);
+    (cpu_byte_addr >= 24'h510000) & (cpu_byte_addr < 24'h510002);
 
   assign work_ram_select =
     work_ram_0_select | work_ram_1_select | work_ram_110_select |
-    work_ram_410_select | work_ram_510_select | work_ram_908_select;
+    work_ram_410_select | work_ram_510_select;
   assign work_ram_addr =
     work_ram_0_select   ? {1'b0, cpu_addr[13:0]} :
     work_ram_1_select   ? {2'b10, cpu_addr[12:0]} :
     work_ram_110_select ? (15'h6000 + {14'h0, cpu_addr[0]}) :
     work_ram_410_select ? (15'h6002 + {14'h0, cpu_addr[0]}) :
     work_ram_510_select ? (15'h6004 + {14'h0, cpu_addr[0]}) :
-    work_ram_908_select ? (15'h6006 + {14'h0, cpu_addr[0]}) :
     15'h0000;
   assign main_ram_select =
     (cpu_byte_addr >= 24'h100000) & (cpu_byte_addr < 24'h110000);
@@ -113,19 +114,25 @@ module AirGalletMainDecoder(
   assign eeprom_select = cpu_byte_addr == 24'h700000;
   assign eeprom_write = eeprom_select & write_strobe;
   assign layer0_vram8_select =
-    (cpu_byte_addr >= 24'h800000) & (cpu_byte_addr < 24'h808000);
+    (cpu_byte_addr >= 24'h800000) & (cpu_byte_addr < 24'h810000);
   assign layer1_vram8_select =
-    (cpu_byte_addr >= 24'h880000) & (cpu_byte_addr < 24'h888000);
+    (cpu_byte_addr >= 24'h880000) & (cpu_byte_addr < 24'h890000);
   assign layer2_vram8_select =
-    (cpu_byte_addr >= 24'h900000) & (cpu_byte_addr < 24'h908000);
+    (cpu_byte_addr >= 24'h900000) & (cpu_byte_addr < 24'h910000);
   assign layer0_regs_select =
     (cpu_byte_addr >= 24'ha00000) & (cpu_byte_addr < 24'ha00006);
   assign layer1_regs_select =
     (cpu_byte_addr >= 24'ha80000) & (cpu_byte_addr < 24'ha80006);
   assign layer2_regs_select =
     (cpu_byte_addr >= 24'hb00000) & (cpu_byte_addr < 24'hb00006);
+  wire sprite_regs_real_select =
+    (cpu_byte_addr >= 24'hb80000) & (cpu_byte_addr < 24'hb80010);
+  wire sprite_regs_stub_select =
+    (cpu_byte_addr >= 24'hb80010) & (cpu_byte_addr < 24'hb80080);
   assign sprite_regs_select =
-    (cpu_byte_addr >= 24'hb80000) & (cpu_byte_addr < 24'hb80080);
+    sprite_regs_real_select | sprite_regs_stub_select;
+  assign sprite_regs_stub_read = sprite_regs_stub_select & read_strobe;
+  assign sprite_regs_stub_write = sprite_regs_stub_select & write_strobe;
   assign irq_select =
     (cpu_byte_addr >= 24'hb80000) & (cpu_byte_addr < 24'hb80008);
   assign irq_read = irq_select & read_strobe;
@@ -145,11 +152,12 @@ module AirGalletMainDecoder(
 
   assign prog_rom_access = prog_rom_select;
   assign prog_rom_ready = prog_rom_access & cpu_rw & prog_rom_valid;
+  assign extra_rom_ready = extra_rom_select & cpu_rw & extra_rom_valid;
   assign sync_dtack =
     main_ram_select | work_ram_select | palette_select | sprite_ram_select |
     layer0_vram8_select | layer1_vram8_select | layer2_vram8_select |
     layer0_regs_select | layer1_regs_select | layer2_regs_select |
-    sprite_regs_select | extra_rom_select | input0_read | input1_read |
+    sprite_regs_select | input0_read | input1_read |
     eeprom_write;
   assign cycle = game_active & cpu_as;
   assign known_select =
@@ -178,10 +186,10 @@ module AirGalletMainDecoder(
   assign layer0_regs_write = layer0_regs_select & write_strobe;
   assign layer1_regs_write = layer1_regs_select & write_strobe;
   assign layer2_regs_write = layer2_regs_select & write_strobe;
-  assign sprite_regs_write = sprite_regs_select & write_strobe;
+  assign sprite_regs_write = sprite_regs_real_select & write_strobe;
 
   assign cpu_space = &cpu_fc;
   assign data_strobe = read_strobe | write_strobe;
-  assign open_bus_select = unmapped_cycle & ~cpu_space & data_strobe;
-  assign dtack = cpu_as & (prog_rom_ready | sync_dtack | sound_select | irq_select | open_bus_select | dtack_reg);
+  assign open_bus_select = 1'b0;
+  assign dtack = cpu_as & (prog_rom_ready | extra_rom_ready | sync_dtack | sound_select | irq_select | dtack_reg);
 endmodule
