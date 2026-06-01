@@ -21,9 +21,12 @@ module AirGalletLayer2TileRomAdapter(
   localparam [2:0] STATE_START_HIGH = 3'd3;
   localparam [2:0] STATE_WAIT_HIGH  = 3'd4;
 
-  // MAME's ROM_CONTINUE for bp962a.u65 keeps the second 1 MiB as the
-  // packed 2bpp source for the decoded layer 2 high planes.
-  localparam [31:0] AIR_LAYER2_HIGH_RAW_BASE = 32'h0030_0000;
+  // MAME allocates layer 2 as a 4 MiB logical region: the first 2 MiB is
+  // bp962a.u57 low 4bpp data, the next 1 MiB is packed bp962a.u65 high-plane
+  // source, and the final 1 MiB is where MAME expands that packed data.  The
+  // MiSTer MRA only stores the stock raw ROMs, so fetch the packed source from
+  // the 0x200000 page and expand it on the fly.
+  localparam [31:0] AIR_LAYER2_HIGH_RAW_BASE = 32'h0020_0000;
 
   reg [2:0]  stateReg;
   reg [31:0] requestAddrReg;
