@@ -1,3 +1,6 @@
+// This file is a Codex-assisted rewrite based on the original work of
+// Josh Bassett (nullobject).
+
 // Video pixel pipeline: layers, sprites, palette lookup, and framebuffer writeout.
 module GPU(
   input          clock,
@@ -413,7 +416,6 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (1'b0),
-    .io_disableLineEffects        (1'b0),
     .io_pen_priority              (layer0PenPriority),
     .io_pen_palette               (layer0PenPalette),
     .io_pen_color                 (layer0PenColor)
@@ -452,7 +454,6 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (1'b0),
-    .io_disableLineEffects        (1'b0),
     .io_pen_priority              (layer1PenPriority),
     .io_pen_palette               (layer1PenPalette),
     .io_pen_color                 (layer1PenColor)
@@ -491,7 +492,6 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (io_gameConfig_airLayer2Direct6bpp),
-    .io_disableLineEffects        (io_gameConfig_airLayer2Direct6bpp),
     .io_pen_priority              (layer2PenPriority),
     .io_pen_palette               (layer2PenPalette),
     .io_pen_color                 (layer2PenColor)
