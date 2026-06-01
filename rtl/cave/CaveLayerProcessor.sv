@@ -32,6 +32,7 @@ module CaveLayerProcessor #(
   input  [8:0]  io_spriteOffset_x,
   input  [8:0]  io_spriteOffset_y,
   input         io_direct6bppPixels,
+  input         io_disableLineEffects,
   output [1:0]  io_pen_priority,
   output [5:0]  io_pen_palette,
   output [7:0]  io_pen_color
@@ -74,9 +75,11 @@ module CaveLayerProcessor #(
     io_video_regs_size_y - io_video_pos_y + io_ctrl_regs_scroll_y - io_spriteOffset_y + layerOffsetY;
   wire [8:0] pos_y = io_ctrl_regs_flipY ? flippedPosY : normalPosY;
 
-  wire [8:0] rowScroll = io_ctrl_regs_rowScrollEnable ? lineEffectReg_rowScroll : 9'h000;
+  wire rowScrollEnable = io_ctrl_regs_rowScrollEnable & ~io_disableLineEffects;
+  wire rowSelectEnable = io_ctrl_regs_rowSelectEnable & ~io_disableLineEffects;
+  wire [8:0] rowScroll = rowScrollEnable ? lineEffectReg_rowScroll : 9'h000;
   wire [8:0] effectivePosX = rowScroll + pos_x;
-  wire [8:0] effectivePosY = io_ctrl_regs_rowSelectEnable ? lineEffectReg_rowSelect : pos_y;
+  wire [8:0] effectivePosY = rowSelectEnable ? lineEffectReg_rowSelect : pos_y;
 
   wire [3:0] tileOffset_x =
     io_ctrl_regs_tileSize ? effectivePosX[3:0] : {1'b0, effectivePosX[2:0]};
