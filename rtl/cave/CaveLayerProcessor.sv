@@ -155,11 +155,18 @@ module CaveLayerProcessor #(
       tileRomAddr = {3'b000, tileReg_code, tileOffset_y[2:1], 3'b000};
   end
 
+  wire direct6bppTileFetch = io_direct6bppPixels & format6bpp;
   wire latchTile =
     io_video_clockEnable
-    & (io_ctrl_regs_flipX
-       ? tileOffset_x == 4'h5
-       : (io_ctrl_regs_tileSize ? tileOffset_x == 4'hA : tileOffset_x == 4'h2));
+    & (
+      direct6bppTileFetch
+        ? (io_ctrl_regs_flipX
+           ? tileOffset_x == 4'h3
+           : (io_ctrl_regs_tileSize ? tileOffset_x == 4'h7 : tileOffset_x == 4'h0))
+        : (io_ctrl_regs_flipX
+           ? tileOffset_x == 4'h5
+           : (io_ctrl_regs_tileSize ? tileOffset_x == 4'hA : tileOffset_x == 4'h2))
+    );
   wire latchColor =
     io_video_clockEnable
     & (io_ctrl_regs_flipX

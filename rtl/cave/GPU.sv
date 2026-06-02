@@ -186,9 +186,10 @@ module GPU(
   wire [7:0]  mixerDebugSelectedColor;
   wire [3:0]  mixerDebugVisibleMask;
 
-  reg          debugSpriteVisibleReg;
-  reg  [5:0]  debugSpritePaletteReg;
-  reg  [7:0]  debugSpriteColorReg;
+  reg          debugLayer2VisibleReg;
+  reg  [1:0]  debugLayer2PriorityReg;
+  reg  [5:0]  debugLayer2PaletteReg;
+  reg  [7:0]  debugLayer2ColorReg;
   reg          debugVideoVBlankReg;
   reg  [7:0]  debugTopRgbFrame;
   reg  [7:0]  debugMidRgbFrame;
@@ -210,7 +211,6 @@ module GPU(
   reg  [7:0]  debugTopPaletteColorLatched;
   reg  [7:0]  debugTopPaletteAddrLatched;
   reg  [7:0]  debugFlashMismatchHistory;
-  wire [7:0]  debugSpriteShade = debugSpriteColorReg ^ {debugSpritePaletteReg, 2'b00};
   wire        debugVideoVBlankRising = io_video_vBlank & ~debugVideoVBlankReg;
   wire        debugOutputBright =
     (|videoRgb888[23:21]) |
@@ -252,9 +252,17 @@ module GPU(
     debugTopVsMidMismatch & (debugTopRgbFrame == debugPrevMidRgb);
   wire [23:0] debugFillRgb =
     (io_video_pos_x[3] ^ io_video_pos_y[3]) ? 24'h181818 : 24'h080808;
-  wire [23:0] debugRawSpriteRgb =
-    debugSpriteVisibleReg
-      ? {8'h80 | debugSpriteShade[7:1], 8'h20 | debugSpriteShade[6:2], 8'h20}
+  wire [7:0] debugLayer2LowRgb = {debugLayer2ColorReg[3:0], debugLayer2ColorReg[3:0]};
+  wire [7:0] debugLayer2HighRgb = {debugLayer2ColorReg[5:4], debugLayer2ColorReg[5:4],
+                                   debugLayer2ColorReg[5:4], debugLayer2ColorReg[5:4]};
+  wire [23:0] debugLayer2PenRgb =
+    debugLayer2VisibleReg
+      ? {
+          debugLayer2LowRgb,
+          debugLayer2HighRgb,
+          debugLayer2PriorityReg, debugLayer2PriorityReg,
+          debugLayer2PriorityReg, debugLayer2PriorityReg
+        }
       : debugFillRgb;
 `endif
 
@@ -264,9 +272,10 @@ module GPU(
     systemFramebufferDinReg <= {8'h00, maskedFramebufferRgb888};
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
     if (io_video_clockEnable) begin
-      debugSpriteVisibleReg <= io_video_displayEnable & (|spritePenColor);
-      debugSpritePaletteReg <= spritePenPalette;
-      debugSpriteColorReg <= spritePenColor;
+      debugLayer2VisibleReg <= io_video_displayEnable & (|layer2PenColor);
+      debugLayer2PriorityReg <= layer2PenPriority;
+      debugLayer2PaletteReg <= layer2PenPalette;
+      debugLayer2ColorReg <= layer2PenColor;
       debugVideoVBlankReg <= io_video_vBlank;
 
       if (reset) begin
@@ -547,6 +556,6 @@ module GPU(
     debugFlashFlagsLatched
   };
   assign io_debug_readout = io_debug_video;
-  assign io_debug_source_rgb = io_video_displayEnable ? debugRawSpriteRgb : 24'h000000;
+  assign io_debug_source_rgb = io_video_displayEnable ? debugLayer2PenRgb : 24'h000000;
 `endif
 endmodule
