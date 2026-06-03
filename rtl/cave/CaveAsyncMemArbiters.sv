@@ -90,9 +90,11 @@ module CaveSoundRomReadArbiter(
   input         io_in_2_rd,
   input  [24:0] io_in_2_addr,
   output [7:0]  io_in_2_dout,
+  output        io_in_2_valid,
   input         io_in_3_rd,
   input  [24:0] io_in_3_addr,
   output [7:0]  io_in_3_dout,
+  output        io_in_3_valid,
   output        io_out_rd,
   output [24:0] io_out_addr,
   input  [7:0]  io_out_dout,
@@ -143,11 +145,76 @@ module CaveSoundRomReadArbiter(
   assign io_in_1_wait_n = (no_request_chosen | chosen[1]) & io_out_wait_n;
   assign io_in_1_valid = chosen[1] & io_out_valid;
   assign io_in_2_dout = io_out_dout;
+  assign io_in_2_valid = chosen[2] & io_out_valid;
   assign io_in_3_dout = io_out_dout;
+  assign io_in_3_valid = chosen[3] & io_out_valid;
   assign io_out_rd = selected_read;
   assign io_out_addr =
     (chosen[0] ? io_in_0_addr : 25'h0) |
     (chosen[1] ? io_in_1_addr : 25'h0) |
     (chosen[2] ? io_in_2_addr : 25'h0) |
     (chosen[3] ? io_in_3_addr : 25'h0);
+endmodule
+
+module CaveSoundRomRead2Arbiter(
+  input         clock,
+  input         reset,
+  input         io_in_0_rd,
+  input  [24:0] io_in_0_addr,
+  output [7:0]  io_in_0_dout,
+  output        io_in_0_wait_n,
+  output        io_in_0_valid,
+  input         io_in_1_rd,
+  input  [24:0] io_in_1_addr,
+  output [7:0]  io_in_1_dout,
+  output        io_in_1_wait_n,
+  output        io_in_1_valid,
+  output        io_out_rd,
+  output [24:0] io_out_addr,
+  input  [7:0]  io_out_dout,
+  input         io_out_wait_n,
+  input         io_out_valid
+);
+
+  localparam [1:0] REQ_NONE = 2'b00;
+  localparam [1:0] REQ_0    = 2'b01;
+  localparam [1:0] REQ_1    = 2'b10;
+
+  reg       read_busy;
+  reg [1:0] locked_request;
+
+  wire [1:0] next_request =
+    io_in_0_rd ? REQ_0 :
+    io_in_1_rd ? REQ_1 :
+                 REQ_NONE;
+
+  wire [1:0] chosen = read_busy ? locked_request : next_request;
+  wire       no_request_chosen = chosen == REQ_NONE;
+  wire       selected_read =
+    (chosen[0] & io_in_0_rd) |
+    (chosen[1] & io_in_1_rd);
+  wire       accepted_read = ~read_busy & selected_read & io_out_wait_n;
+
+  always @(posedge clock) begin
+    if (reset) begin
+      read_busy <= 1'b0;
+      locked_request <= REQ_NONE;
+    end
+    else begin
+      read_busy <= ~io_out_valid & (accepted_read | read_busy);
+      if (accepted_read & ~io_out_valid)
+        locked_request <= next_request;
+    end
+  end
+
+  assign io_in_0_dout = io_out_dout;
+  assign io_in_0_wait_n = (no_request_chosen | chosen[0]) & io_out_wait_n;
+  assign io_in_0_valid = chosen[0] & io_out_valid;
+  assign io_in_1_dout = io_out_dout;
+  assign io_in_1_wait_n = (no_request_chosen | chosen[1]) & io_out_wait_n;
+  assign io_in_1_valid = chosen[1] & io_out_valid;
+  assign io_out_rd = selected_read;
+  assign io_out_addr =
+    (chosen[0] ? io_in_0_addr : 25'h0) |
+    (chosen[1] ? io_in_1_addr : 25'h0);
 endmodule

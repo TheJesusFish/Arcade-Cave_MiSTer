@@ -10,6 +10,7 @@ module CaveGameConfig (
   output reg [1:0]  sound_0_device,
   output reg [31:0] sound_0_rom_offset,
   output reg [31:0] sound_1_rom_offset,
+  output reg [31:0] sound_2_rom_offset,
   output reg [1:0]  layer_0_format,
   output reg [31:0] layer_0_rom_offset,
   output reg [1:0]  layer_0_palette_bank,
@@ -51,6 +52,7 @@ module CaveGameConfig (
     sound_0_device      = SOUND_DEVICE_YMZ280B;
     sound_0_rom_offset  = 32'h0010_0080;
     sound_1_rom_offset  = 32'h0000_0000;
+    sound_2_rom_offset  = 32'h0000_0000;
     layer_0_format      = GFX_FORMAT_4BPP;
     layer_0_rom_offset  = 32'h0050_0080;
     layer_0_palette_bank = 2'h1;
@@ -234,6 +236,7 @@ module CaveGameConfig (
         sound_0_device      = SOUND_DEVICE_Z80;
         sound_0_rom_offset  = 32'h0008_0080;
         sound_1_rom_offset  = 32'h00d0_0080;
+        sound_2_rom_offset  = 32'h00f0_0080;
         layer_0_format      = GFX_FORMAT_4BPP;
         layer_0_rom_offset  = 32'h0060_0080;
         layer_0_palette_bank = 2'h1;

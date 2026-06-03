@@ -9,6 +9,7 @@ module MemSys(
   input  [31:0] io_gameConfig_eepromOffset,
   input  [31:0] io_gameConfig_sound_0_romOffset,
   input  [31:0] io_gameConfig_sound_1_romOffset,
+  input  [31:0] io_gameConfig_sound_2_romOffset,
   input  [31:0] io_gameConfig_layer_0_romOffset,
   input  [31:0] io_gameConfig_layer_1_romOffset,
   input  [31:0] io_gameConfig_layer_2_romOffset,
@@ -47,6 +48,11 @@ module MemSys(
   output [7:0]  io_soundRom_1_dout,
   output        io_soundRom_1_wait_n,
   output        io_soundRom_1_valid,
+  input         io_soundRom_2_rd,
+  input  [24:0] io_soundRom_2_addr,
+  output [7:0]  io_soundRom_2_dout,
+  output        io_soundRom_2_wait_n,
+  output        io_soundRom_2_valid,
   input         io_layerTileRom_0_rd,
   input  [31:0] io_layerTileRom_0_addr,
   output [63:0] io_layerTileRom_0_dout,
@@ -183,6 +189,11 @@ module MemSys(
   wire [15:0] soundRomCache1OutDout;
   wire        soundRomCache1OutWaitN;
   wire        soundRomCache1OutValid;
+  wire        soundRomCache1InRd;
+  wire [24:0] soundRomCache1InAddr;
+  wire [7:0]  soundRomCache1InDout;
+  wire        soundRomCache1InWaitN;
+  wire        soundRomCache1InValid;
 
   wire        layerRomCache0OutRd;
   wire [24:0] layerRomCache0OutAddr;
@@ -222,8 +233,11 @@ module MemSys(
     eepromCacheOutAddr + io_gameConfig_eepromOffset[24:0];
   wire [24:0] soundRom0SdramAddr =
     soundRomCache0OutAddr + io_gameConfig_sound_0_romOffset[24:0];
-  wire [24:0] soundRom1SdramAddr =
-    soundRomCache1OutAddr + io_gameConfig_sound_1_romOffset[24:0];
+  wire [24:0] soundRom1CacheInAddr =
+    io_soundRom_1_addr + io_gameConfig_sound_1_romOffset[24:0];
+  wire [24:0] soundRom2CacheInAddr =
+    io_soundRom_2_addr + io_gameConfig_sound_2_romOffset[24:0];
+  wire [24:0] soundRom1SdramAddr = soundRomCache1OutAddr;
   wire [24:0] layerRom0SdramAddr =
     layerRomCache0OutAddr + io_gameConfig_layer_0_romOffset[24:0];
   wire [24:0] layerRom1SdramAddr =
@@ -414,16 +428,36 @@ module MemSys(
     .clock         (clock),
     .reset         (reset),
     .io_enable     (readyEnableReg),
-    .io_in_rd      (io_soundRom_1_rd),
-    .io_in_addr    (io_soundRom_1_addr),
-    .io_in_dout    (io_soundRom_1_dout),
-    .io_in_wait_n  (io_soundRom_1_wait_n),
-    .io_in_valid   (io_soundRom_1_valid),
+    .io_in_rd      (soundRomCache1InRd),
+    .io_in_addr    (soundRomCache1InAddr),
+    .io_in_dout    (soundRomCache1InDout),
+    .io_in_wait_n  (soundRomCache1InWaitN),
+    .io_in_valid   (soundRomCache1InValid),
     .io_out_rd     (soundRomCache1OutRd),
     .io_out_addr   (soundRomCache1OutAddr),
     .io_out_dout   (soundRomCache1OutDout),
     .io_out_wait_n (soundRomCache1OutWaitN),
     .io_out_valid  (soundRomCache1OutValid)
+  );
+
+  CaveSoundRomRead2Arbiter soundRom12InputArbiter (
+    .clock          (clock),
+    .reset          (reset),
+    .io_in_0_rd     (io_soundRom_1_rd),
+    .io_in_0_addr   (soundRom1CacheInAddr),
+    .io_in_0_dout   (io_soundRom_1_dout),
+    .io_in_0_wait_n (io_soundRom_1_wait_n),
+    .io_in_0_valid  (io_soundRom_1_valid),
+    .io_in_1_rd     (io_soundRom_2_rd),
+    .io_in_1_addr   (soundRom2CacheInAddr),
+    .io_in_1_dout   (io_soundRom_2_dout),
+    .io_in_1_wait_n (io_soundRom_2_wait_n),
+    .io_in_1_valid  (io_soundRom_2_valid),
+    .io_out_rd      (soundRomCache1InRd),
+    .io_out_addr    (soundRomCache1InAddr),
+    .io_out_dout    (soundRomCache1InDout),
+    .io_out_wait_n  (soundRomCache1InWaitN),
+    .io_out_valid   (soundRomCache1InValid)
   );
 
   CaveReadCache #(

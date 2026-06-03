@@ -4,6 +4,7 @@
 // Signed audio mixer with fixed-point gain and 16-bit output clipping.
 module AudioMixer (
   input         clock,
+  input         io_airgallet,
   input         io_mazinger,
   input  [13:0] io_in_4,
   input  [13:0] io_in_3,
@@ -18,6 +19,11 @@ module AudioMixer (
   wire signed [18:0] channel_1_sample = $signed({{3{io_in_1[15]}}, io_in_1});
   wire signed [21:0] channel_3_sample = $signed({{6{io_in_3[13]}}, io_in_3, 2'b00});
   wire signed [21:0] mazinger_fm_sample = $signed({{6{io_in_2[15]}}, io_in_2});
+  wire signed [28:0] air_fm_sample = $signed({{13{io_in_2[15]}}, io_in_2});
+  wire signed [28:0] air_bgm_sample = $signed({{13{io_in_3[13]}}, io_in_3, 2'b00});
+  wire signed [28:0] air_sfx_sample = $signed({{13{io_in_4[13]}}, io_in_4, 2'b00});
+  reg signed [28:0]  air_bgm_sample_reg;
+  wire signed [28:0] air_bgm_smoothed = (air_bgm_sample + air_bgm_sample_reg) >>> 1;
 
   wire signed [18:0] channel_1_gain =
     channel_1_sample + (channel_1_sample <<< 1);
@@ -41,9 +47,26 @@ module AudioMixer (
     + mazinger_oki_gain;
   wire signed [28:0] legacy_mix_ext = {{3{legacy_mix_sum[25]}}, legacy_mix_sum};
   wire signed [28:0] mazinger_mix_ext = {{3{mazinger_mix_sum[25]}}, mazinger_mix_sum};
+  wire signed [28:0] air_fm_gain =
+    air_fm_sample <<< 2;                                  // x4
+  wire signed [28:0] air_bgm_gain =
+    (air_bgm_smoothed <<< 6)
+    + (air_bgm_smoothed <<< 5)
+    + (air_bgm_smoothed <<< 4)
+    + air_bgm_smoothed;                                   // x113
+  wire signed [28:0] air_sfx_gain =
+    (air_sfx_sample <<< 6)
+    + (air_sfx_sample <<< 4);                             // x80
+  wire signed [28:0] air_mix_sum =
+    air_fm_gain + air_bgm_gain + air_sfx_gain;
+  wire signed [28:0] air_mix_ext_next = air_mix_sum >>> 1;
   wire signed [28:0] mazinger_boosted_mix_sum =
     (mazinger_mix_ext <<< 1) + (mazinger_mix_ext >>> 2);
-  wire signed [28:0] mix_sum = io_mazinger ? mazinger_boosted_mix_sum : legacy_mix_ext;
+  reg signed [28:0] air_mix_ext_reg;
+  wire signed [28:0] mix_sum =
+    io_airgallet ? air_mix_ext_reg :
+    io_mazinger  ? mazinger_boosted_mix_sum :
+                   legacy_mix_ext;
 
   wire signed [28:0] scaled_sum = mix_sum >>> 4;
   wire signed [28:0] clipped_low = scaled_sum < MIN_SAMPLE ? MIN_SAMPLE : scaled_sum;
@@ -51,8 +74,11 @@ module AudioMixer (
 
   reg signed [28:0] audio_reg;
 
-  always @(posedge clock)
+  always @(posedge clock) begin
+    air_bgm_sample_reg <= air_bgm_sample;
+    air_mix_ext_reg <= air_mix_ext_next;
     audio_reg <= clipped;
+  end
 
   assign io_out = audio_reg[15:0];
 endmodule

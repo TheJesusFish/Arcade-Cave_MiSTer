@@ -13,6 +13,7 @@ module VideoSys(
   input         io_prog_done,
   input  [3:0]  io_options_offset_x,
   input  [3:0]  io_options_offset_y,
+  input         io_options_shiftRightTest,
   input         io_options_compatibility,
   input         io_options_wideTiming,
   output        io_video_clockEnable,
@@ -96,6 +97,9 @@ module VideoSys(
   reg       compatibilityChangeModeReg;
   reg       wideChangeModeReg;
 
+  wire [3:0] effectiveOffsetX =
+    io_options_shiftRightTest ? (io_options_offset_x + 4'd2) : io_options_offset_x;
+
   always @(posedge io_videoClock) begin
     if (io_videoReset) begin
       originalOffsetX <= 4'd0;
@@ -117,17 +121,17 @@ module VideoSys(
     end
     else begin
       if (originalVSync) begin
-        originalOffsetX <= io_options_offset_x;
+        originalOffsetX <= effectiveOffsetX;
         originalOffsetY <= io_options_offset_y;
       end
 
       if (compatibilityVSync) begin
-        compatibilityOffsetX <= io_options_offset_x;
+        compatibilityOffsetX <= effectiveOffsetX;
         compatibilityOffsetY <= io_options_offset_y;
       end
 
       if (wideVSync) begin
-        wideOffsetX <= io_options_offset_x;
+        wideOffsetX <= effectiveOffsetX;
         wideOffsetY <= io_options_offset_y;
       end
 
