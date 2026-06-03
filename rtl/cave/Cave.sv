@@ -641,7 +641,6 @@ module Cave(
     .io_prog_done               (_videoSys_io_prog_done),
     .io_options_offset_x        (options_offset_x),
     .io_options_offset_y        (options_offset_y),
-    .io_options_shiftRightTest  (gameIsAirGallet),
     .io_options_compatibility   (options_compatibility),
     .io_options_wideTiming      (gameIsMazinger),
     .io_video_clockEnable       (_videoSys_io_video_clockEnable),
