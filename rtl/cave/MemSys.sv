@@ -194,7 +194,6 @@ module MemSys(
   wire [7:0]  soundRomCache1InDout;
   wire        soundRomCache1InWaitN;
   wire        soundRomCache1InValid;
-
   wire        layerRomCache0OutRd;
   wire [24:0] layerRomCache0OutAddr;
   wire [15:0] layerRomCache0OutDout;
@@ -218,6 +217,7 @@ module MemSys(
 
   wire        gameIsMazinger;
   wire        gameIsAirGallet;
+  wire        gameIsSailorMoon;
   wire        copyDmaStart = io_prog_done & ~copyDmaStartedReg;
   wire        decryptDmaStart = copyDmaDoneReg & gameIsMazinger & ~decryptDmaStartedReg;
   wire [31:0] ddrDownloadAddr = ddrDownloadBufferOutAddr + IOCTL_DOWNLOAD_BASE_ADDR;
@@ -258,6 +258,7 @@ module MemSys(
     .game_is_hotdogstorm         (),
     .game_is_mazinger            (gameIsMazinger),
     .game_is_airgallet           (gameIsAirGallet),
+    .game_is_sailormoon          (gameIsSailorMoon),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (),
@@ -529,7 +530,8 @@ module MemSys(
   AirGalletLayer2TileRomAdapter airGalletLayer2TileRomAdapter (
     .clock           (clock),
     .reset           (reset),
-    .game_active     (gameIsAirGallet),
+    .game_active     (gameIsAirGallet | gameIsSailorMoon),
+    .sailormoon_mode (gameIsSailorMoon),
     .io_in_rd        (io_layerTileRom_2_rd),
     .io_in_addr      (io_layerTileRom_2_addr),
     .io_in_dout      (io_layerTileRom_2_dout),

@@ -6,6 +6,7 @@ module AirGalletMainDecoder(
   input         cpu_rw,
   input         read_strobe,
   input         write_strobe,
+  input         extra_rom_has_data,
   input         prog_rom_valid,
   input         dtack_reg,
   output [23:0] cpu_byte_addr,
@@ -143,13 +144,13 @@ module AirGalletMainDecoder(
     write_strobe;
   assign sprite_swap_write = (cpu_byte_addr == 24'hb80008) & write_strobe;
 
-  assign prog_rom_access = prog_rom_select;
+  assign prog_rom_access = prog_rom_select | (extra_rom_has_data & extra_rom_select);
   assign prog_rom_ready = prog_rom_access & cpu_rw & prog_rom_valid;
   assign sync_dtack =
     main_ram_select | work_ram_select | palette_select | sprite_ram_select |
     layer0_vram8_select | layer1_vram8_select | layer2_vram8_select |
     layer0_regs_select | layer1_regs_select | layer2_regs_select |
-    sprite_regs_select | extra_rom_select | input0_read | input1_read |
+    sprite_regs_select | (extra_rom_select & ~extra_rom_has_data) | input0_read | input1_read |
     eeprom_write;
   assign cycle = game_active & cpu_as;
   assign known_select =
@@ -160,7 +161,8 @@ module AirGalletMainDecoder(
     layer2_regs_select | sprite_regs_select | sound_select;
   assign unmapped_cycle = cycle & ~known_select;
 
-  assign prog_rom_read = prog_rom_select & read_strobe;
+  assign prog_rom_read =
+    (prog_rom_select | (extra_rom_has_data & extra_rom_select)) & read_strobe;
   assign work_ram_read = work_ram_select & read_strobe;
   assign work_ram_write = work_ram_select & write_strobe;
   assign main_ram_read = main_ram_select & read_strobe;

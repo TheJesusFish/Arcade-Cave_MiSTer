@@ -163,7 +163,8 @@ module CaveSoundRomReadFreezer(
   wire      wait_n = io_out_wait_n | (wait_n_latched & ~clear);
   wire      valid = io_out_valid | (valid_latched & ~clear);
   wire      clear_read = clear & clear_read_d;
-  wire      out_rd = io_in_rd & (~pending_read | clear_read) & ~valid;
+  wire      read_result_held = valid_latched & ~clear;
+  wire      out_rd = io_in_rd & (~pending_read | clear_read) & ~read_result_held;
   wire      accepted_read = out_rd & io_out_wait_n;
   wire      latched_data_selected = data_latched_valid & ~clear;
   wire [24:0] valid_addr = latched_data_selected ? data_addr_latched : request_addr_latched;

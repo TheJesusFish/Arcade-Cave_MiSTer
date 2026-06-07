@@ -14,6 +14,7 @@ module AirGalletMainReadMux(
   input         sprite_ram_select,
   input         work_ram_select,
   input         main_ram_select,
+  input         extra_rom_has_data,
   input         extra_rom_read,
   input         prog_rom_ready,
   input         open_bus_read,
@@ -68,6 +69,8 @@ module AirGalletMainReadMux(
       data = work_ram_data;
     else if (main_ram_select)
       data = main_ram_data;
+    else if (extra_rom_read & extra_rom_has_data)
+      data = prog_rom_data;
     else if (extra_rom_read)
       data = 16'h0000;
     else if (prog_rom_ready)

@@ -131,6 +131,8 @@ module Main(
   wire        gameIsHotdogStorm;
   wire        gameIsMazinger;
   wire        gameIsAirGallet;
+  wire        gameIsSailorMoon;
+  wire        gameIsAirFamily;
 
   CaveBoardProfile boardProfile(
     .game_index                  (io_gameIndex),
@@ -145,12 +147,15 @@ module Main(
     .game_is_hotdogstorm         (gameIsHotdogStorm),
     .game_is_mazinger            (gameIsMazinger),
     .game_is_airgallet           (gameIsAirGallet),
+    .game_is_sailormoon          (gameIsSailorMoon),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (),
     .sound_is_oki                (),
     .sound_is_z80                ()
   );
+
+  assign gameIsAirFamily = gameIsAirGallet | gameIsSailorMoon;
 
   wire        mem_7_wr;
   wire        mem_6_wr;
@@ -574,9 +579,9 @@ module Main(
   wire [15:0] airGalletWorkRamData;
 
   assign airGalletVideoIrqClear =
-    gameIsAirGallet & airGalletIrqRead & (airGalletIrqWordOffset == 2'h2);
+    gameIsAirFamily & airGalletIrqRead & (airGalletIrqWordOffset == 2'h2);
   assign airGalletUnknownIrqClear =
-    gameIsAirGallet & airGalletIrqRead & (airGalletIrqWordOffset == 2'h3);
+    gameIsAirFamily & airGalletIrqRead & (airGalletIrqWordOffset == 2'h3);
 
   MazingerMainMap mazingerMainMap(
     .clock                (clock),
@@ -717,13 +722,14 @@ module Main(
   );
 
   AirGalletMainMap airGalletMainMap(
-    .game_active          (gameIsAirGallet),
+    .game_active          (gameIsAirFamily),
     .cpu_addr             (_cpu_io_addr),
     .cpu_fc               (_cpu_io_fc),
     .cpu_as               (_cpu_io_as),
     .cpu_rw               (_cpu_io_rw),
     .read_strobe          (readStrobe),
     .write_strobe         (writeStrobe),
+    .extra_rom_has_data   (gameIsSailorMoon),
     .prog_rom_valid       (io_progRom_valid),
     .dtack_reg            (dtackReg),
     .agallet_irq          (agalletIrq),
@@ -1571,53 +1577,53 @@ module Main(
   reg  [15:0] tmp_31;
   wire        cs_191 = cpuByteAddr > 24'h8FFFFF & cpuByteAddr < 24'h901000;
   wire        vram16x16_1_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer1Vram16Read
+    gameIsAirFamily ? airGalletLayer1Vram16Read
       : gameIsHotdogStorm ? cs_191 & readStrobe : _GEN_169;
   wire        vram16x16_1_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer1Vram16Write
+    gameIsAirFamily ? airGalletLayer1Vram16Write
       : gameIsHotdogStorm ? cs_191 & writeStrobe : _GEN_170;
   wire        cs_192 = cpuByteAddr > 24'h900FFF & cpuByteAddr < 24'h901800;
   wire        lineRam_1_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer1LineRead
+    gameIsAirFamily ? airGalletLayer1LineRead
       : gameIsHotdogStorm ? cs_192 & readStrobe : _GEN_171;
   wire        lineRam_1_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer1LineWrite
+    gameIsAirFamily ? airGalletLayer1LineWrite
       : gameIsHotdogStorm ? cs_192 & writeStrobe : _GEN_172;
   reg  [15:0] tmp_32;
   wire        cs_194 = cpuByteAddr > 24'h903FFF & cpuByteAddr < 24'h908000;
   wire        vram8x8_1_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer1Vram8OnlyRead
+    gameIsAirFamily ? airGalletLayer1Vram8OnlyRead
       : gameIsMazinger ? mazingerLayer1Vram8Read
       : gameIsHotdogStorm ? cs_194 & readStrobe : _GEN_173;
   wire        vram8x8_1_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer1Vram8OnlyWrite
+    gameIsAirFamily ? airGalletLayer1Vram8OnlyWrite
       : gameIsMazinger ? mazingerLayer1Vram8Write
       : gameIsHotdogStorm ? cs_194 & writeStrobe : _GEN_174;
   reg  [15:0] tmp_33;
   wire        cs_196 = cpuByteAddr > 24'h97FFFF & cpuByteAddr < 24'h981000;
   wire        vram16x16_2_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer2Vram16Read
+    gameIsAirFamily ? airGalletLayer2Vram16Read
       : gameIsHotdogStorm ? cs_196 & readStrobe : _GEN_175;
   wire        vram16x16_2_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer2Vram16Write
+    gameIsAirFamily ? airGalletLayer2Vram16Write
       : gameIsHotdogStorm ? cs_196 & writeStrobe : _GEN_176;
   wire        cs_197 = cpuByteAddr > 24'h980FFF & cpuByteAddr < 24'h981800;
   wire        lineRam_2_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer2LineRead
+    gameIsAirFamily ? airGalletLayer2LineRead
       : gameIsHotdogStorm ? cs_197 & readStrobe : _GEN_177;
   wire        lineRam_2_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer2LineWrite
+    gameIsAirFamily ? airGalletLayer2LineWrite
       : gameIsHotdogStorm ? cs_197 & writeStrobe : _GEN_178;
   reg  [15:0] tmp_34;
   wire        cs_199 = cpuByteAddr > 24'h983FFF & cpuByteAddr < 24'h988000;
   wire        vram8x8_2_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer2Vram8OnlyRead
+    gameIsAirFamily ? airGalletLayer2Vram8OnlyRead
       : gameIsHotdogStorm ? cs_199 & readStrobe : _GEN_179;
   wire        vram8x8_2_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer2Vram8OnlyWrite
+    gameIsAirFamily ? airGalletLayer2Vram8OnlyWrite
       : gameIsHotdogStorm ? cs_199 & writeStrobe : _GEN_180;
   wire [12:0] vram8x8_2_io_portA_addr =
-    gameIsAirGallet | gameIsHotdogStorm | gameIsGuwange | gameIsGaia | gameIsEsprade
+    gameIsAirFamily | gameIsHotdogStorm | gameIsGuwange | gameIsGaia | gameIsEsprade
       ? _cpu_io_addr[12:0]
       : _GEN_66;
   reg  [15:0] tmp_35;
@@ -1631,12 +1637,12 @@ module Main(
   wire        _GEN_205 = gameIsHotdogStorm ? cs_206 & writeStrobe : _GEN_183;
   wire        cs_207 = cpuByteAddr > 24'hB7FFFF & cpuByteAddr < 24'hB80006;
   wire        layerRegs_1_io_mem_wr =
-    gameIsAirGallet ? airGalletLayer1RegsWrite
+    gameIsAirFamily ? airGalletLayer1RegsWrite
       : gameIsMazinger ? mazingerLayer1RegsWrite
       : gameIsHotdogStorm ? cs_207 & writeStrobe : _GEN_184;
   wire        cs_208 = cpuByteAddr > 24'hBFFFFF & cpuByteAddr < 24'hC00006;
   wire        layerRegs_2_io_mem_wr =
-    gameIsAirGallet ? airGalletLayer2RegsWrite
+    gameIsAirFamily ? airGalletLayer2RegsWrite
       : gameIsHotdogStorm ? cs_208 & writeStrobe : _GEN_185;
   wire        cs_213 = cpuByteAddr > 24'hEFFFFF & cpuByteAddr < 24'hF10000;
   wire        _GEN_206 = gameIsHotdogStorm ? cs_213 & readStrobe : _GEN_161;
@@ -1644,51 +1650,51 @@ module Main(
   wire        cs_214 = cpuByteAddr < 24'h100000;
   wire        cs_215 = (|(_cpu_io_addr[22:19])) & cpuByteAddr < 24'h110000;
   wire        mainRam_io_rd =
-    gameIsAirGallet ? airGalletMainRamRead
+    gameIsAirFamily ? airGalletMainRamRead
       : gameIsMazinger ? mazingerMainRamRead
       : gameIsUopoko ? cs_215 & readStrobe : _GEN_190;
   wire        mainRam_io_wr =
-    gameIsAirGallet ? airGalletMainRamWrite
+    gameIsAirFamily ? airGalletMainRamWrite
       : gameIsMazinger ? mazingerMainRamWrite
       : gameIsUopoko ? cs_215 & writeStrobe : _GEN_191;
   wire        cs_216 = cpuByteAddr > 24'h2FFFFF & cpuByteAddr < 24'h300004;
   wire        cs_217 = (|(_cpu_io_addr[22:21])) & cpuByteAddr < 24'h410000;
   wire        spriteRam_io_portA_rd =
-    gameIsAirGallet ? airGalletSpriteRamRead
+    gameIsAirFamily ? airGalletSpriteRamRead
       : gameIsMazinger ? mazingerSpriteRamRead
       : gameIsUopoko ? cs_217 & readStrobe : _GEN_206;
   wire        spriteRam_io_portA_wr =
-    gameIsAirGallet ? airGalletSpriteRamWrite
+    gameIsAirFamily ? airGalletSpriteRamWrite
       : gameIsMazinger ? mazingerSpriteRamWrite
       : gameIsUopoko ? cs_217 & writeStrobe : _GEN_207;
   wire        cs_218 = cpuByteAddr > 24'h4FFFFF & cpuByteAddr < 24'h501000;
   wire        vram16x16_0_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer0Vram16Read
+    gameIsAirFamily ? airGalletLayer0Vram16Read
       : gameIsUopoko ? cs_218 & readStrobe : _GEN_195;
   wire        vram16x16_0_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer0Vram16Write
+    gameIsAirFamily ? airGalletLayer0Vram16Write
       : gameIsUopoko ? cs_218 & writeStrobe : _GEN_196;
   wire        cs_219 = cpuByteAddr > 24'h500FFF & cpuByteAddr < 24'h501800;
   wire        lineRam_0_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer0LineRead
+    gameIsAirFamily ? airGalletLayer0LineRead
       : gameIsUopoko ? cs_219 & readStrobe : _GEN_197;
   wire        lineRam_0_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer0LineWrite
+    gameIsAirFamily ? airGalletLayer0LineWrite
       : gameIsUopoko ? cs_219 & writeStrobe : _GEN_198;
   reg  [15:0] tmp_36;
   wire        cs_221 = cpuByteAddr > 24'h503FFF & cpuByteAddr < 24'h508000;
   wire        vram8x8_0_io_portA_rd =
-    gameIsAirGallet ? airGalletLayer0Vram8OnlyRead
+    gameIsAirFamily ? airGalletLayer0Vram8OnlyRead
       : gameIsMazinger ? mazingerLayer0Vram8Read
       : gameIsUopoko ? cs_221 & readStrobe : _GEN_199;
   wire        vram8x8_0_io_portA_wr =
-    gameIsAirGallet ? airGalletLayer0Vram8OnlyWrite
+    gameIsAirFamily ? airGalletLayer0Vram8OnlyWrite
       : gameIsMazinger ? mazingerLayer0Vram8Write
       : gameIsUopoko ? cs_221 & writeStrobe : _GEN_200;
   reg  [15:0] tmp_37;
   wire        cs_224 = cpuByteAddr > 24'h5FFFFF & cpuByteAddr < 24'h600010;
   wire        spriteRegs_io_mem_wr =
-    gameIsAirGallet ? airGalletSpriteRegsWrite
+    gameIsAirFamily ? airGalletSpriteRegsWrite
       : gameIsMazinger ? mazingerSpriteRegsWrite
       : gameIsUopoko ? mem_7_wr : _GEN_201;
   wire [2:0]  spriteRegs_io_mem_addr =
@@ -1700,20 +1706,20 @@ module Main(
   wire        _GEN_209 = cpuByteAddr > 24'h600007 & cpuByteAddr < 24'h600009 & writeStrobe;
   wire        cs_227 = cpuByteAddr > 24'h6FFFFF & cpuByteAddr < 24'h700006;
   wire        layerRegs_0_io_mem_wr =
-    gameIsAirGallet ? airGalletLayer0RegsWrite
+    gameIsAirFamily ? airGalletLayer0RegsWrite
       : gameIsMazinger ? mazingerLayer0RegsWrite
       : gameIsUopoko ? cs_227 & writeStrobe : _GEN_205;
   wire        cs_228 = _cpu_io_addr[22] & cpuByteAddr < 24'h810000;
   wire        paletteRam_io_portA_rd =
-    gameIsAirGallet ? airGalletPaletteRead
+    gameIsAirFamily ? airGalletPaletteRead
       : gameIsMazinger ? mazingerPaletteRead
       : gameIsUopoko ? cs_228 & readStrobe : _GEN_192;
   wire        paletteRam_io_portA_wr =
-    gameIsAirGallet ? airGalletPaletteWrite
+    gameIsAirFamily ? airGalletPaletteWrite
       : gameIsMazinger ? mazingerPaletteWrite
       : gameIsUopoko ? cs_228 & writeStrobe : _GEN_193;
   wire [14:0] paletteRam_io_portA_addr =
-    gameIsAirGallet ? airGalletPaletteRamAddr
+    gameIsAirFamily ? airGalletPaletteRamAddr
       : gameIsMazinger ? mazingerPaletteRamAddr
       : gameIsUopoko ? _cpu_io_addr[14:0] : _GEN_194;
   wire        _GEN_210 = videoVBlankRising | videoIrq;
@@ -1963,7 +1969,7 @@ module Main(
   wire        _GEN_429 = gameIsGuwange ? cs_179 & writeStrobe : _GEN_428;
   wire        _GEN_430 = gameIsHotdogStorm ? cs_211 & writeStrobe : _GEN_429;
   wire        eepromMem_wr =
-    gameIsAirGallet ? airGalletEepromWrite
+    gameIsAirFamily ? airGalletEepromWrite
       : gameIsMazinger ? mazingerEepromWrite
       : gameIsUopoko ? cs_231 & writeStrobe : _GEN_430;
   wire        cs_120 = cpuByteAddr > 24'h5017FF & cpuByteAddr < 24'h504000;
@@ -2242,14 +2248,14 @@ module Main(
     end
     else begin
       videoIrq <=
-        gameIsAirGallet
+        gameIsAirFamily
           ? (videoIrq | videoVBlankRising) & ~airGalletVideoIrqClear
         : gameIsMazinger
           ? videoVBlankRising | (videoIrq & ~mazingerVideoIrqClear)
           : _GEN_421 ? ~(_offset_T_222 == 24'h4 | _GEN_412) & _GEN_385 : ~_GEN_412 & _GEN_385;
       agalletIrq <= videoVBlankRising | (~videoVBlankFalling & agalletIrq);
       unknownIrq <=
-        gameIsAirGallet
+        gameIsAirFamily
           ? unknownIrq & ~airGalletUnknownIrqClear
         : gameIsMazinger
           ? (unknownIrq | videoVBlankRising) & ~mazingerUnknownIrqClear
@@ -2258,7 +2264,7 @@ module Main(
         if (mazingerReadDataValid)
           dinReg <= mazingerReadData;
       end
-      else if (gameIsAirGallet) begin
+      else if (gameIsAirFamily) begin
         if (airGalletReadDataValid)
           dinReg <= airGalletReadData;
       end
@@ -4392,7 +4398,7 @@ module Main(
       else if (_GEN_218)
         dinReg <= 16'h0;
       dtackReg <=
-        gameIsAirGallet
+        gameIsAirFamily
           ? airGalletDtack
           : gameIsMazinger
           ? mazingerDtack
@@ -5193,21 +5199,21 @@ module Main(
   assign io_soundCtrl_ymz_addr = _cpu_io_addr;
   assign io_soundCtrl_ymz_din = _cpu_io_dout;
   assign io_soundCtrl_req =
-    gameIsAirGallet ? airGalletSoundWrite
+    gameIsAirFamily ? airGalletSoundWrite
       : gameIsMazinger ? mazingerSoundWrite : gameIsHotdogStorm & _GEN_204;
   assign io_soundCtrl_data = _cpu_io_dout;
   assign io_soundCtrl_reply_rd =
-    (gameIsAirGallet & airGalletSoundRead) | (gameIsMazinger & mazingerSoundRead);
+    (gameIsAirFamily & airGalletSoundRead) | (gameIsMazinger & mazingerSoundRead);
   assign io_progRom_rd =
-    gameIsAirGallet ? airGalletProgRomRead
+    gameIsAirFamily ? airGalletProgRomRead
       : gameIsMazinger ? mazingerProgRomRead
       : gameIsUopoko ? cs_214 & readStrobe : _GEN_189;
   assign io_progRom_addr =
     (gameIsMazinger & mazingerExtraRomSelect)
       ? {1'b1, cpuByteAddr[18:0]}
-      : {_cpu_io_addr[18:0], 1'h0};
+      : {_cpu_io_addr[18:0], 1'b0};
   assign io_spriteFrameBufferSwap =
-    gameIsAirGallet ? airGalletSpriteSwapWrite
+    gameIsAirFamily ? airGalletSpriteSwapWrite
       : gameIsMazinger ? videoVBlankRising
       : gameIsUopoko ? _GEN_209 | _GEN_203 | _GEN_160 : _GEN_203 | _GEN_160;
 endmodule

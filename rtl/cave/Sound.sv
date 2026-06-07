@@ -45,6 +45,8 @@ module Sound(
   wire        hotdogZ80;
   wire        mazingerZ80;
   wire        airgalletZ80;
+  wire        sailormoonZ80;
+  wire        airFamilyZ80Sound;
   wire        z80Game;
   wire        donpachi;
   wire        soundDeviceIsOki;
@@ -64,12 +66,15 @@ module Sound(
     .game_is_hotdogstorm         (hotdogZ80),
     .game_is_mazinger            (mazingerZ80),
     .game_is_airgallet           (airgalletZ80),
+    .game_is_sailormoon          (sailormoonZ80),
     .board_uses_z80_sound        (z80Game),
     .board_is_vertical_clockwise (),
     .sound_is_ymz280b            (soundDeviceIsYmz),
     .sound_is_oki                (soundDeviceIsOki),
     .sound_is_z80                (soundDeviceIsZ80)
   );
+
+  assign airFamilyZ80Sound = airgalletZ80 | sailormoonZ80;
 
   reg         reqReg;
   reg  [15:0] dataReg;
@@ -85,15 +90,23 @@ module Sound(
   reg  [13:0] oki0AudioReg;
   reg  [13:0] oki1AudioReg;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  reg  [7:0]  debugLastOkiPhrase;
-  reg  [7:0]  debugLastOkiStart;
-  reg  [7:0]  debugLastOkiBank;
   reg  [7:0]  debugLastSoundCommand;
   reg  [7:0]  debugLastReply;
-  reg  [7:0]  debugLastYmReg;
+  reg  [7:0]  debugLastLatchRead;
+  reg  [7:0]  debugLastOkiBank;
+  reg  [7:0]  debugLastOkiPhrase;
+  reg  [7:0]  debugLastOkiStart;
+  reg  [7:0]  debugLastYmAddr;
   reg  [7:0]  debugLastYmData;
+  reg  [7:0]  debugLastIoAddr;
+  reg  [7:0]  debugLastIoData;
+  reg  [7:0]  debugLastOkiRomAddr;
+  reg  [7:0]  debugLastOkiRomData;
+  reg  [7:0]  debugLastZ80RomAddrHi;
+  reg  [7:0]  debugLastZ80RomAddrLo;
+  reg  [7:0]  debugLastZ80RomData;
   reg  [7:0]  debugFlags;
-  reg         debugOkiPending;
+  reg         debugOkiPhrasePending;
 `endif
   reg         z80IoWrD;
   reg  [7:0]  z80IoWrAddrD;
@@ -119,39 +132,41 @@ module Sound(
   wire        z80RamSelect =
     hotdogZ80 ? cpuAddr > 16'hDFFF :
     mazingerZ80 ? ((cpuAddr > 16'hBFFF) & (cpuAddr < 16'hC800)) | (cpuAddr > 16'hF7FF) :
-    airgalletZ80 ? cpuAddr >= 16'hC000 :
+    airFamilyZ80Sound ? cpuAddr >= 16'hC000 :
                   1'b0;
   wire [15:0] cpuIoAddr = {8'h00, cpuAddr[7:0]};
   wire        z80IoWr = z80Game & cpuIorq & cpuWr;
   wire        z80IoWrChanged =
     z80IoWr & ((cpuIoAddr[7:0] != z80IoWrAddrD) | (cpuDout != z80IoWrDataD));
-  wire        z80IoWrPulse = z80IoWr & (~z80IoWrD | (airgalletZ80 & z80IoWrChanged));
+  wire        z80IoWrPulse = z80IoWr & (~z80IoWrD | (airFamilyZ80Sound & z80IoWrChanged));
   wire        latchLowRead = z80Game & (cpuIoAddr == 16'h0030) & cpuIorq & cpuRd;
-  wire        latchHighRead = (hotdogZ80 | airgalletZ80) & (cpuIoAddr == 16'h0040) & cpuIorq & cpuRd;
-  wire        soundFlagsRead = airgalletZ80 & (cpuIoAddr == 16'h0020) & cpuIorq & cpuRd;
-  wire        airYm2151Access = airgalletZ80 & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052) & cpuIorq;
+  wire        latchHighRead = (hotdogZ80 | airFamilyZ80Sound) & (cpuIoAddr == 16'h0040) & cpuIorq & cpuRd;
+  wire        soundFlagsRead = airFamilyZ80Sound & (cpuIoAddr == 16'h0020) & cpuIorq & cpuRd;
+  wire        airYm2151Access = airFamilyZ80Sound & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052) & cpuIorq;
   wire        airYm2151Write = airYm2151Access & z80IoWrPulse;
   wire        airYm2151Read = airYm2151Access & cpuRd;
-  wire        ym2203Write =
-    ((hotdogZ80 & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052)) |
-     (mazingerZ80 & (cpuIoAddr > 16'h0051) & (cpuIoAddr < 16'h0054))) & z80IoWrPulse;
-  wire        ym2203Read =
+  wire        ym2203ClassicWrite =
+    ~airFamilyZ80Sound & z80Game &
+    (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052) & z80IoWrPulse;
+  wire        ym2203ClassicRead =
     ((hotdogZ80 & (cpuIoAddr > 16'h004F) & (cpuIoAddr < 16'h0052)) |
      (mazingerZ80 & (cpuIoAddr > 16'h0051) & (cpuIoAddr < 16'h0054))) & cpuIorq & cpuRd;
+  wire        ym2203Write = ym2203ClassicWrite;
+  wire        ym2203Read = ym2203ClassicRead;
   wire        oki0Access =
-    (airgalletZ80 & (cpuIoAddr == 16'h0060)) & cpuIorq;
+    (airFamilyZ80Sound & (cpuIoAddr == 16'h0060)) & cpuIorq;
   wire        oki1Access =
     ((hotdogZ80 & (cpuIoAddr == 16'h0060)) |
-     (airgalletZ80 & (cpuIoAddr == 16'h0080)) |
+     (airFamilyZ80Sound & (cpuIoAddr == 16'h0080)) |
      (mazingerZ80 & (cpuIoAddr == 16'h0070))) & cpuIorq;
-  wire        airgalletOki0BankWrite = airgalletZ80 & (cpuIoAddr == 16'h0070) & z80IoWrPulse;
-  wire        airgalletOki1BankWrite = airgalletZ80 & (cpuIoAddr == 16'h00C0) & z80IoWrPulse;
+  wire        airgalletOki0BankWrite = airFamilyZ80Sound & (cpuIoAddr == 16'h0070) & z80IoWrPulse;
+  wire        airgalletOki1BankWrite = airFamilyZ80Sound & (cpuIoAddr == 16'h00C0) & z80IoWrPulse;
   wire        hotdogOkiBankWrite = hotdogZ80 & (cpuIoAddr == 16'h0070) & z80IoWrPulse;
   wire        mazingerOkiBankWrite = mazingerZ80 & (cpuIoAddr == 16'h0074) & z80IoWrPulse;
   wire        oki0BankWrite = airgalletOki0BankWrite;
   wire        oki1BankWrite = airgalletOki1BankWrite | hotdogOkiBankWrite | mazingerOkiBankWrite;
   wire        okiBankWrite = oki0BankWrite | oki1BankWrite;
-  wire        soundReplyWrite = (mazingerZ80 | airgalletZ80) & (cpuIoAddr == 16'h0010) & z80IoWrPulse;
+  wire        soundReplyWrite = (mazingerZ80 | airFamilyZ80Sound) & (cpuIoAddr == 16'h0010) & z80IoWrPulse;
   wire        replyPop = io_ctrl_reply_rd & (replyCount != 6'd0);
   wire        replyPush = soundReplyWrite & ((replyCount != 6'd32) | replyPop);
 
@@ -164,8 +179,15 @@ module Sound(
   wire [7:0]  bankRomDout;
   wire        bankRomValid;
   wire        z80RomRead = z80Game & cpuMreq & cpuRd & ~cpuRfsh & (z80ProgRomSelect | z80BankRomSelect);
+  wire        z80ProgRomArbiterRead =
+    soundDeviceIsZ80 & z80Game & z80ProgRomSelect & ~cpuRfsh &
+    (airFamilyZ80Sound ? (cpuMreq & cpuRd) : 1'b1);
+  wire        z80BankRomArbiterRead =
+    soundDeviceIsZ80 & z80Game & z80BankRomSelect & ~cpuRfsh &
+    (airFamilyZ80Sound ? (cpuMreq & cpuRd) : 1'b1);
   wire        z80RomValid = z80BankRomSelect ? bankRomValid : progRomValid;
-  wire        z80WaitN = ~(airgalletZ80 & z80RomRead) | z80RomValid;
+  wire        z80RomNeedsWait = airFamilyZ80Sound;
+  wire        z80WaitN = ~(z80RomNeedsWait & z80RomRead) | z80RomValid;
   wire [7:0]  romOrBankDout = z80BankRomSelect & cpuMreq & cpuRd ? bankRomDout : progRomDout;
 
   wire [7:0]  oki0CpuDout;
@@ -176,11 +198,13 @@ module Sound(
   wire        oki0AudioValid;
   wire [13:0] oki0Audio;
   wire        z80Oki0CpuWr = oki0Access & z80IoWrPulse;
-  wire        oki0CpuWrRaw = airgalletZ80 ? z80Oki0CpuWr : io_ctrl_oki_0_wr;
-  wire [7:0]  oki0CpuDinRaw = airgalletZ80 ? cpuDout : io_ctrl_oki_0_din[7:0];
+  wire        oki0CpuWrRaw =
+    airFamilyZ80Sound ? z80Oki0CpuWr : io_ctrl_oki_0_wr;
+  wire [7:0]  oki0CpuDinRaw =
+    airFamilyZ80Sound ? cpuDout : io_ctrl_oki_0_din[7:0];
   wire        oki0CpuWr = oki0CpuWrRaw;
   wire [7:0]  oki0CpuDin = oki0CpuDinRaw;
-  wire [16:0] oki0CenStep = airgalletZ80 ? 17'h10E5 : 17'h0873;
+  wire [16:0] oki0CenStep = airFamilyZ80Sound ? 17'h10E5 : 17'h0873;
 
   wire [7:0]  oki1CpuDout;
   wire        oki1RomRead;
@@ -193,10 +217,6 @@ module Sound(
   wire        oki1CpuWr = oki1CpuWrRaw;
   wire [7:0]  oki1CpuDin = oki1CpuDinRaw;
   wire [16:0] oki1CenStep = mazingerZ80 ? 17'h0873 : 17'h10E5;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  wire [7:0]  debugOkiCpuDin = oki1CpuWrRaw ? oki1CpuDinRaw : oki0CpuDinRaw;
-`endif
-
   wire [7:0]  ym2203CpuDout;
   wire        ym2203AudioValid;
   wire [15:0] ym2203PsgAudio;
@@ -233,10 +253,13 @@ module Sound(
   wire [24:0] airOki1MappedAddr = {4'h0, oki1Bank, oki1RomAddr[16:0]};
   wire [24:0] oki0MappedAddr = donpachi ? nmkOki0AddrOut : defaultOki0MappedAddr;
   wire [24:0] oki1MappedAddr = donpachi ? nmkOki1AddrOut : {4'h0, oki1Bank, oki1RomAddr[16:0]};
-  wire [7:0]  oki0RomData = airgalletZ80 ? io_rom_1_dout : oki0RomDout;
-  wire        oki0RomDataValid = airgalletZ80 ? io_rom_1_valid : oki0RomValid;
-  wire [7:0]  oki1RomData = airgalletZ80 ? io_rom_2_dout : io_rom_1_dout;
-  wire        oki1RomDataValid = airgalletZ80 ? io_rom_2_valid : io_rom_1_valid;
+  wire [7:0]  oki0RomData = airFamilyZ80Sound ? io_rom_1_dout : oki0RomDout;
+  wire        oki0RomDataValid = airFamilyZ80Sound ? io_rom_1_valid : oki0RomValid;
+  wire [7:0]  oki1RomData = airFamilyZ80Sound ? io_rom_2_dout : io_rom_1_dout;
+  wire        oki1RomDataValid = airFamilyZ80Sound ? io_rom_2_valid : io_rom_1_valid;
+`ifdef CAVE_ENABLE_DEBUG_OVERLAY
+  wire        debugOki1RomDataValid = mazingerZ80 ? io_rom_1_valid : oki1RomDataValid;
+`endif
 
   always @(posedge clock) begin
     if (reset) begin
@@ -247,15 +270,23 @@ module Sound(
       oki1BankHiReg <= 4'h0;
       oki1BankLoReg <= 4'h0;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
-      debugLastOkiPhrase <= 8'h0;
-      debugLastOkiStart <= 8'h0;
-      debugLastOkiBank <= 8'h0;
-      debugLastSoundCommand <= 8'h0;
-      debugLastReply <= 8'h0;
-      debugLastYmReg <= 8'h0;
-      debugLastYmData <= 8'h0;
-      debugFlags <= 8'h0;
-      debugOkiPending <= 1'b0;
+      debugLastSoundCommand <= 8'h00;
+      debugLastReply <= 8'h00;
+      debugLastLatchRead <= 8'h00;
+      debugLastOkiBank <= 8'h00;
+      debugLastOkiPhrase <= 8'h00;
+      debugLastOkiStart <= 8'h00;
+      debugLastYmAddr <= 8'h00;
+      debugLastYmData <= 8'h00;
+      debugLastIoAddr <= 8'h00;
+      debugLastIoData <= 8'h00;
+      debugLastOkiRomAddr <= 8'h00;
+      debugLastOkiRomData <= 8'h00;
+      debugLastZ80RomAddrHi <= 8'h00;
+      debugLastZ80RomAddrLo <= 8'h00;
+      debugLastZ80RomData <= 8'h00;
+      debugFlags <= 8'h00;
+      debugOkiPhrasePending <= 1'b0;
 `endif
       z80IoWrD <= 1'b0;
       z80IoWrAddrD <= 8'h00;
@@ -273,35 +304,92 @@ module Sound(
 
       reqReg <= ~(z80Game & (latchHighRead | latchLowRead)) & (io_ctrl_req | reqReg);
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
-      debugFlags[0] <= debugOkiPending;
-      debugFlags[1] <= reqReg;
-      debugFlags[2] <= cpuInt;
-      debugFlags[3] <= z80IoWrPulse;
-      debugFlags[4] <= ym2151AudioValid;
-      debugFlags[5] <= oki0AudioValid;
-      debugFlags[6] <= oki1AudioValid;
-      debugFlags[7] <= airYm2151Write | oki0CpuWrRaw | oki1CpuWrRaw | okiBankWrite;
+      debugFlags <= debugFlags | (mazingerZ80 ? {
+        oki1AudioValid,
+        |oki1AudioReg,
+        oki1RomDataValid,
+        oki1RomRead,
+        z80Oki1CpuWr,
+        oki1CpuWr,
+        oki1Access & cpuRd,
+        ym2203Read
+      } : {
+        debugOki1RomDataValid,
+        oki1RomRead,
+        z80Oki1CpuWr,
+        ym2203Write,
+        soundReplyWrite,
+        latchHighRead,
+        latchLowRead,
+        io_ctrl_req
+      });
 
       if (io_ctrl_req)
         debugLastSoundCommand <= io_ctrl_data[7:0];
+
+      if (z80IoWrPulse & (cpuIoAddr[7:0] != 8'h10) & (~mazingerZ80 | ym2203Write | z80Oki1CpuWr | oki1BankWrite)) begin
+        debugLastIoAddr <= cpuIoAddr[7:0];
+        debugLastIoData <= cpuDout;
+      end
+
+      if (latchLowRead)
+        debugLastLatchRead <= dataReg[7:0];
+      else if (latchHighRead)
+        debugLastLatchRead <= dataReg[15:8];
+
+      if (oki1BankWrite)
+        debugLastOkiBank <= cpuDout;
+
+      if (z80Oki1CpuWr) begin
+        if (cpuDout[7]) begin
+          debugLastOkiPhrase <= cpuDout;
+          debugOkiPhrasePending <= 1'b1;
+        end
+        else if (debugOkiPhrasePending) begin
+          debugLastOkiStart <= cpuDout;
+          debugOkiPhrasePending <= 1'b0;
+        end
+        else begin
+          debugLastOkiStart <= cpuDout;
+        end
+      end
+
+      if (ym2203Write) begin
+        if (cpuIoAddr[0])
+          debugLastYmData <= cpuDout;
+        else
+          debugLastYmAddr <= cpuDout;
+      end
+
+      if (mazingerZ80 & oki1RomRead)
+        debugLastOkiRomAddr <= oki1RomAddr[7:0];
+      else if (oki1RomDataValid)
+        debugLastOkiRomAddr <= oki1MappedAddr[23:16];
+
+      if (debugOki1RomDataValid) begin
+        debugLastOkiRomData <= oki1RomData;
+      end
+
+      if (mazingerZ80 & z80RomRead & z80RomValid) begin
+        debugLastZ80RomAddrHi <= cpuAddr[15:8];
+        debugLastZ80RomAddrLo <= cpuAddr[7:0];
+        debugLastZ80RomData <= romOrBankDout;
+      end
 `endif
 
       if (z80Game & (cpuIoAddr == 16'h0000) & z80IoWrPulse)
         z80BankReg <=
-          airgalletZ80 ? cpuDout[4:0] :
+          airFamilyZ80Sound ? cpuDout[4:0] :
           mazingerZ80 ? {2'b00, cpuDout[2:0]} :
                         {1'b0, cpuDout[3:0]};
 
       if (oki0BankWrite) begin
         oki0BankHiReg <= cpuDout[7:4];
         oki0BankLoReg <= cpuDout[3:0];
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-        debugLastOkiBank <= cpuDout;
-`endif
       end
 
       if (oki1BankWrite) begin
-        if (airgalletZ80) begin
+        if (airFamilyZ80Sound) begin
           oki1BankHiReg <= cpuDout[7:4];
           oki1BankLoReg <= cpuDout[3:0];
         end
@@ -309,33 +397,7 @@ module Sound(
           oki1BankHiReg <= {2'b00, cpuDout[5:4]};
           oki1BankLoReg <= {2'b00, cpuDout[1:0]};
         end
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-        debugLastOkiBank <= cpuDout;
-`endif
       end
-
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-      if (ym2203Write | airYm2151Write) begin
-        if (cpuAddr[0])
-          debugLastYmData <= cpuDout;
-        else
-          debugLastYmReg <= cpuDout;
-      end
-
-      if (oki0CpuWrRaw | oki1CpuWrRaw) begin
-        if (debugOkiPending) begin
-          debugLastOkiStart <= debugOkiCpuDin;
-          debugOkiPending <= 1'b0;
-        end
-        else if (debugOkiCpuDin[7]) begin
-          debugLastOkiPhrase <= {1'b0, debugOkiCpuDin[6:0]};
-          debugOkiPending <= 1'b1;
-        end
-        else begin
-          debugOkiPending <= 1'b0;
-        end
-      end
-`endif
 
       if (replyPush) begin
         replyFifo[replyWritePtr] <= cpuDout;
@@ -388,7 +450,7 @@ module Sound(
     .io_rfsh (cpuRfsh),
     .io_mreq (cpuMreq),
     .io_iorq (cpuIorq),
-    .io_fast_clock (airgalletZ80),
+    .io_fast_clock (airFamilyZ80Sound),
     .io_wait_n (z80WaitN),
     .io_int  (cpuInt),
     .io_nmi  (reqReg)
@@ -426,8 +488,8 @@ module Sound(
     .io_cen_step     (oki0CenStep),
     .io_cpu_wr       (oki0CpuWr),
     .io_cpu_din      (oki0CpuDin),
-    .io_stretch_cpu_wr (airgalletZ80),
-    .io_wait_for_rom (airgalletZ80),
+    .io_stretch_cpu_wr (airFamilyZ80Sound),
+    .io_wait_for_rom (airFamilyZ80Sound),
     .io_cpu_dout     (oki0CpuDout),
     .io_rom_rd       (oki0RomRead),
     .io_rom_addr     (oki0RomAddr),
@@ -445,8 +507,8 @@ module Sound(
     .io_cen_step     (oki1CenStep),
     .io_cpu_wr       (oki1CpuWr),
     .io_cpu_din      (oki1CpuDin),
-    .io_stretch_cpu_wr (airgalletZ80),
-    .io_wait_for_rom (mazingerZ80 | airgalletZ80),
+    .io_stretch_cpu_wr (airFamilyZ80Sound),
+    .io_wait_for_rom (mazingerZ80 | airFamilyZ80Sound),
     .io_cpu_dout     (oki1CpuDout),
     .io_rom_rd       (oki1RomRead),
     .io_rom_addr     (oki1RomAddr),
@@ -502,7 +564,7 @@ module Sound(
   CaveSoundRomReadArbiter arbiter (
     .clock          (clock),
     .reset          (reset),
-    .io_in_0_rd     (soundDeviceIsOki | (~airgalletZ80 & oki0RomRead)),
+    .io_in_0_rd     (soundDeviceIsOki),
     .io_in_0_addr   (oki0MappedAddr),
     .io_in_0_dout   (oki0RomDout),
     .io_in_0_valid  (oki0RomValid),
@@ -511,11 +573,11 @@ module Sound(
     .io_in_1_dout   (ymzRomDout),
     .io_in_1_wait_n (ymzRomWaitN),
     .io_in_1_valid  (ymzRomValid),
-    .io_in_2_rd     (soundDeviceIsZ80 & z80Game & cpuMreq & cpuRd & z80ProgRomSelect & ~cpuRfsh),
+    .io_in_2_rd     (z80ProgRomArbiterRead),
     .io_in_2_addr   ({9'h000, cpuAddr}),
     .io_in_2_dout   (progRomDout),
     .io_in_2_valid  (progRomValid),
-    .io_in_3_rd     (soundDeviceIsZ80 & z80Game & cpuMreq & cpuRd & z80BankRomSelect & ~cpuRfsh),
+    .io_in_3_rd     (z80BankRomArbiterRead),
     .io_in_3_addr   ({6'h00, z80BankReg, cpuAddr[13:0]}),
     .io_in_3_dout   (bankRomDout),
     .io_in_3_valid  (bankRomValid),
@@ -526,12 +588,12 @@ module Sound(
     .io_out_valid   (io_rom_0_valid)
   );
 
-  wire [15:0] fmMixInput = airgalletZ80 ? ym2151AudioReg : ym2203FmAudioReg;
-  wire [15:0] psgMixInput = airgalletZ80 ? 16'h0000 : ym2203PsgAudioReg;
+  wire [15:0] fmMixInput = airFamilyZ80Sound ? ym2151AudioReg : ym2203FmAudioReg;
+  wire [15:0] psgMixInput = airFamilyZ80Sound ? 16'h0000 : ym2203PsgAudioReg;
 
   AudioMixer io_audio_mixer (
     .clock   (clock),
-    .io_airgallet (airgalletZ80),
+    .io_airgallet (airFamilyZ80Sound),
     .io_mazinger (mazingerZ80),
     .io_in_4 (oki1AudioReg),
     .io_in_3 (oki0AudioReg),
@@ -541,18 +603,23 @@ module Sound(
     .io_out  (io_audio)
   );
 
-  assign cpuInt = airgalletZ80 ? ym2151Irq : ym2203Irq;
+  assign cpuInt = airFamilyZ80Sound ? ym2151Irq : ym2203Irq;
 
   assign io_ctrl_oki_0_dout = {8'h00, oki0CpuDout};
   assign io_ctrl_oki_1_dout = {8'h00, oki1CpuDout};
   assign io_ctrl_ymz_dout = {8'h00, ymzCpuDout};
   assign io_ctrl_reply = (replyCount == 6'd0) ? 16'h00ff : {8'h00, replyFifo[replyReadPtr]};
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
+  wire [7:0] debugH0 = mazingerZ80 ? oki1CpuDout : debugLastYmAddr;
+  wire [7:0] debugH1 = mazingerZ80 ? oki1AudioReg[13:6] : debugLastYmData;
+  wire [7:0] debugH2 = debugFlags;
+  wire [7:0] debugStartOrLatch = mazingerZ80 ? debugLastOkiStart : debugLastOkiStart;
+
   wire [63:0] debugCommandBits = {
-    debugFlags,
-    debugLastYmData,
-    debugLastYmReg,
-    debugLastOkiStart,
+    debugH2,
+    debugH1,
+    debugH0,
+    debugStartOrLatch,
     debugLastOkiPhrase,
     debugLastOkiBank,
     debugLastReply,
@@ -564,10 +631,11 @@ module Sound(
   assign io_debug = 64'd0;
 `endif
   assign io_rom_1_rd =
-    airgalletZ80 ? oki0RomRead :
-    mazingerZ80  ? oki1RomRead :
-                   1'b1;
-  assign io_rom_1_addr = airgalletZ80 ? airOki0MappedAddr : oki1MappedAddr;
-  assign io_rom_2_rd = airgalletZ80 & oki1RomRead;
+    airFamilyZ80Sound ? oki0RomRead :
+                         1'b1;
+  assign io_rom_1_addr =
+    airFamilyZ80Sound ? airOki0MappedAddr :
+                   oki1MappedAddr;
+  assign io_rom_2_rd = airFamilyZ80Sound & oki1RomRead;
   assign io_rom_2_addr = airOki1MappedAddr;
 endmodule

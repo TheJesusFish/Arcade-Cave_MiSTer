@@ -29,8 +29,9 @@ module CaveOKIM6295 #(
   reg        romDataReady;
   wire [16:0] cenNext = {1'b0, cenAccumulator} + io_cen_step;
   wire        romAddrChanged = io_rom_addr != requestedRomAddr;
-  wire        chipRomOk = io_wait_for_rom ? romDataReady : io_rom_valid;
-  wire [7:0]  chipRomData = io_wait_for_rom ? romDataReg : io_rom_dout;
+  wire        bufferRomForWait = io_stretch_cpu_wr;
+  wire        chipRomOk = (io_wait_for_rom & bufferRomForWait) ? romDataReady : io_rom_valid;
+  wire [7:0]  chipRomData = (io_wait_for_rom & bufferRomForWait) ? romDataReg : io_rom_dout;
   wire        hold_for_rom = io_wait_for_rom & cenNext[16] & ~chipRomOk;
   localparam integer WRITE_HOLD_RELOAD =
     WRITE_HOLD_CYCLES <= 1 ? 0 :
@@ -100,5 +101,5 @@ module CaveOKIM6295 #(
     .sample   (io_audio_valid)
   );
 
-  assign io_rom_rd = io_wait_for_rom ? (romAddrChanged | ~romDataReady) : 1'b1;
+  assign io_rom_rd = (io_wait_for_rom & bufferRomForWait) ? (romAddrChanged | ~romDataReady) : 1'b1;
 endmodule

@@ -363,6 +363,7 @@ module Cave(
   wire         rotateClockwise;
   wire         gameIsMazinger;
   wire         gameIsAirGallet;
+  wire         gameIsSailorMoon;
 
   CaveGameConfig gameConfig (
     .game_index           (gameIndexReg),
@@ -399,6 +400,7 @@ module Cave(
     .game_is_hotdogstorm         (),
     .game_is_mazinger            (gameIsMazinger),
     .game_is_airgallet           (gameIsAirGallet),
+    .game_is_sailormoon          (gameIsSailorMoon),
     .board_uses_z80_sound        (),
     .board_is_vertical_clockwise (rotateClockwise),
     .sound_is_ymz280b            (),
@@ -991,7 +993,7 @@ module Cave(
     .io_gameConfig_layer_1_paletteBank   (_gpu_io_gameConfig_layer_1_paletteBank),
     .io_gameConfig_layer_2_paletteBank   (gameConfig_layer_2_paletteBank),
     .io_gameConfig_maskLeftColumn        (gameIsAirGallet),
-    .io_gameConfig_airLayer2Direct6bpp   (gameIsAirGallet),
+    .io_gameConfig_airLayer2Direct6bpp   (gameIsAirGallet | gameIsSailorMoon),
     .io_options_rotate                   (effectiveRotate),
     .io_options_rotateClockwise          (rotateClockwise),
     .io_options_flipVideo                (options_flipVideo),
@@ -1024,11 +1026,10 @@ module Cave(
   );
 
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  wire [63:0] mazingerSpriteProbeDebugBits = _gpu_io_debug_video;
   wire [63:0] debugBits =
     options_debugView == 3'd1 ? _main_io_debug_cpu :
     options_debugView == 3'd2 ? _main_io_debug_writes :
-    options_debugView == 3'd3 ? (gameIsMazinger ? mazingerSpriteProbeDebugBits : _main_io_debug_live) :
+    options_debugView == 3'd3 ? _main_io_debug_live :
     options_debugView == 3'd4 ? _main_io_debug_palette :
     options_debugView == 3'd5 ? _main_io_debug_data :
     options_debugView == 3'd6 ? _gpu_io_debug_video :

@@ -4,6 +4,7 @@ module AirGalletLayer2TileRomAdapter(
   input         clock,
   input         reset,
   input         game_active,
+  input         sailormoon_mode,
   input         io_in_rd,
   input  [31:0] io_in_addr,
   output [63:0] io_in_dout,
@@ -21,12 +22,11 @@ module AirGalletLayer2TileRomAdapter(
   localparam [2:0] STATE_START_HIGH = 3'd3;
   localparam [2:0] STATE_WAIT_HIGH  = 3'd4;
 
-  // MAME allocates layer 2 as a 4 MiB logical region: the first 2 MiB is
-  // bp962a.u57 low 4bpp data, the next 1 MiB is packed bp962a.u65 high-plane
-  // source, and the final 1 MiB is where MAME expands that packed data.  The
-  // MiSTer MRA only stores the stock raw ROMs, so fetch the packed source from
-  // the 0x200000 page and expand it on the fly.
+  // Air Gallet stores 2 MiB of low 4bpp data followed by 1 MiB of packed
+  // high-plane source. Sailor Moon uses the same idea at a larger scale:
+  // 10 MiB low data followed by 5 MiB packed high-plane source.
   localparam [31:0] AIR_LAYER2_HIGH_RAW_BASE = 32'h0020_0000;
+  localparam [31:0] SAILOR_LAYER2_HIGH_RAW_BASE = 32'h00a0_0000;
 
   reg [2:0]  stateReg;
   reg [31:0] requestAddrReg;
@@ -36,7 +36,8 @@ module AirGalletLayer2TileRomAdapter(
 
   wire [31:0] splitLowAddr = {1'b0, requestAddrReg[31:1]};
   wire [31:0] splitHighRawAddr =
-    AIR_LAYER2_HIGH_RAW_BASE + {2'b00, requestAddrReg[31:2]};
+    (sailormoon_mode ? SAILOR_LAYER2_HIGH_RAW_BASE : AIR_LAYER2_HIGH_RAW_BASE) +
+    {2'b00, requestAddrReg[31:2]};
 
   wire [31:0] lowRow =
     splitLowAddr[2] ? lowDataReg[31:0] : lowDataReg[63:32];

@@ -44,23 +44,6 @@ module SpriteProcessor(
   reg [9:0]  spriteCounter;
   reg [15:0] tileCounter;
   reg        readPendingReg;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  reg [2:0]  debugAbcExactFlags;
-  reg [2:0]  debugAbcExactFlagsLatched;
-  reg [2:0]  debugAbcWriteFlags;
-  reg [2:0]  debugAbcWriteFlagsLatched;
-  reg [2:0]  debugAbcSlotFlags;
-  reg [2:0]  debugAbcSlotFlagsLatched;
-  reg [2:0]  debugAbcActiveFlags;
-  reg [7:0]  debugAbcExactHistory;
-  reg [7:0]  debugAbcWriteHistory;
-  reg [7:0]  debugAbcSlot160Code;
-  reg [7:0]  debugAbcSlot161Code;
-  reg [7:0]  debugAbcSlot162Code;
-  reg [7:0]  debugAbcSlot160CodeLatched;
-  reg [7:0]  debugAbcSlot161CodeLatched;
-  reg [7:0]  debugAbcSlot162CodeLatched;
-`endif
   reg        frameReadyReg;
 
   reg [1:0]  spriteReg_priority;
@@ -116,26 +99,6 @@ module SpriteProcessor(
   wire effectiveRead = tileRomRead & io_ctrl_tileRom_wait_n;
   wire acceptedFrameStart = io_ctrl_start & (stateReg == STATE_IDLE);
   wire frameDone = (stateReg == STATE_DONE) & ~blitterBusy;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  wire acceptedBlitterConfig = blitterConfigValid & blitterConfigReady;
-  wire debugAbcSlot160 = spriteCounter == 10'h160;
-  wire debugAbcSlot161 = spriteCounter == 10'h161;
-  wire debugAbcSlot162 = spriteCounter == 10'h162;
-  wire [2:0] debugAbcSlotMatchFlags = {
-    debugAbcSlot162,
-    debugAbcSlot161,
-    debugAbcSlot160
-  };
-  wire debugAbcCodeA = spriteReg_code == 18'h00041;
-  wire debugAbcCodeB = spriteReg_code == 18'h00042;
-  wire debugAbcCodeC = spriteReg_code == 18'h00043;
-  wire [2:0] debugAbcExactMatchFlags = {
-    debugAbcSlot162 & debugAbcCodeC,
-    debugAbcSlot161 & debugAbcCodeB,
-    debugAbcSlot160 & debugAbcCodeA
-  };
-`endif
-
   wire [17:0] normalFixedPosX = {io_ctrl_vram_dout[47:32], 2'b00};
   wire [17:0] normalIntegerPosX = {io_ctrl_vram_dout[41:32], 8'h00};
   wire [17:0] zoomFixedPosX = {io_ctrl_vram_dout[15:0], 2'b00};
@@ -176,23 +139,6 @@ module SpriteProcessor(
       readPendingReg <= 1'b0;
       spriteCounter <= 10'h000;
       tileCounter <= 16'h0000;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-      debugAbcExactFlags <= 3'b000;
-      debugAbcExactFlagsLatched <= 3'b000;
-      debugAbcWriteFlags <= 3'b000;
-      debugAbcWriteFlagsLatched <= 3'b000;
-      debugAbcSlotFlags <= 3'b000;
-      debugAbcSlotFlagsLatched <= 3'b000;
-      debugAbcActiveFlags <= 3'b000;
-      debugAbcExactHistory <= 8'h00;
-      debugAbcWriteHistory <= 8'h00;
-      debugAbcSlot160Code <= 8'h00;
-      debugAbcSlot161Code <= 8'h00;
-      debugAbcSlot162Code <= 8'h00;
-      debugAbcSlot160CodeLatched <= 8'h00;
-      debugAbcSlot161CodeLatched <= 8'h00;
-      debugAbcSlot162CodeLatched <= 8'h00;
-`endif
       frameReadyReg <= 1'b0;
     end
     else begin
@@ -205,53 +151,8 @@ module SpriteProcessor(
       if (effectiveRead)
         tileCounter <= tileCounterWrap ? 16'h0000 : tileCounter + 16'h0001;
 
-      if (acceptedFrameStart) begin
+      if (acceptedFrameStart)
         frameReadyReg <= 1'b0;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-        debugAbcExactFlagsLatched <= debugAbcExactFlags;
-        debugAbcWriteFlagsLatched <= debugAbcWriteFlags;
-        debugAbcSlotFlagsLatched <= debugAbcSlotFlags;
-        debugAbcExactHistory <= {
-          debugAbcExactHistory[6:0],
-          debugAbcExactFlags == 3'b111
-        };
-        debugAbcWriteHistory <= {
-          debugAbcWriteHistory[6:0],
-          debugAbcWriteFlags == 3'b111
-        };
-        debugAbcSlot160CodeLatched <= debugAbcSlot160Code;
-        debugAbcSlot161CodeLatched <= debugAbcSlot161Code;
-        debugAbcSlot162CodeLatched <= debugAbcSlot162Code;
-        debugAbcExactFlags <= 3'b000;
-        debugAbcWriteFlags <= 3'b000;
-        debugAbcSlotFlags <= 3'b000;
-        debugAbcActiveFlags <= 3'b000;
-        debugAbcSlot160Code <= 8'h00;
-        debugAbcSlot161Code <= 8'h00;
-        debugAbcSlot162Code <= 8'h00;
-`endif
-      end
-
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-      if (stateReg == STATE_CHECK) begin
-        debugAbcSlotFlags <= debugAbcSlotFlags | (debugAbcSlotMatchFlags & {3{spriteEnabled}});
-
-        if (debugAbcSlot160)
-          debugAbcSlot160Code <= spriteReg_code[7:0];
-        if (debugAbcSlot161)
-          debugAbcSlot161Code <= spriteReg_code[7:0];
-        if (debugAbcSlot162)
-          debugAbcSlot162Code <= spriteReg_code[7:0];
-      end
-
-      if (acceptedBlitterConfig) begin
-        debugAbcActiveFlags <= debugAbcExactMatchFlags;
-        debugAbcExactFlags <= debugAbcExactFlags | debugAbcExactMatchFlags;
-      end
-
-      if (io_frameBuffer_wr)
-        debugAbcWriteFlags <= debugAbcWriteFlags | debugAbcActiveFlags;
-`endif
 
       if (frameDone)
         frameReadyReg <= 1'b1;
@@ -378,18 +279,5 @@ module SpriteProcessor(
   assign io_ctrl_tileRom_addr = tileRomAddr[31:0];
   assign io_ctrl_tileRom_burstLength = {2'b00, tileRomBurstLength};
   assign io_ctrl_frameReady = frameReadyReg;
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  assign io_debug = {
-    debugAbcSlot162CodeLatched,
-    debugAbcSlot161CodeLatched,
-    debugAbcSlot160CodeLatched,
-    debugAbcWriteHistory,
-    debugAbcExactHistory,
-    {5'b00000, debugAbcSlotFlagsLatched},
-    {5'b00000, debugAbcWriteFlagsLatched},
-    {5'b00000, debugAbcExactFlagsLatched}
-  };
-`else
   assign io_debug = 64'd0;
-`endif
 endmodule

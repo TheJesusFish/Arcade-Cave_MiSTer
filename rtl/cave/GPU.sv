@@ -179,7 +179,6 @@ module GPU(
   reg [31:0] systemFramebufferDinReg;
 
   wire activeDisplayPixel = io_video_clockEnable & io_video_displayEnable;
-  wire [63:0] spriteDebug;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   wire [3:0]  mixerDebugSelectedPen;
   wire [5:0]  mixerDebugSelectedPalette;
@@ -389,7 +388,7 @@ module GPU(
     .io_frameBuffer_din          (io_spriteFrameBuffer_din),
     .io_frameBuffer_wait_n       (io_spriteFrameBuffer_wait_n),
     .io_ctrl_frameReady          (io_spriteCtrl_frameReady),
-    .io_debug                    (spriteDebug)
+    .io_debug                    ()
   );
 
   CaveLayerProcessor #(

@@ -14,6 +14,7 @@ module CaveBoardProfile(
   output       game_is_hotdogstorm,
   output       game_is_mazinger,
   output       game_is_airgallet,
+  output       game_is_sailormoon,
   output       board_uses_z80_sound,
   output       board_is_vertical_clockwise,
   output       sound_is_ymz280b,
@@ -30,6 +31,7 @@ module CaveBoardProfile(
   localparam [3:0] GAME_HOTDOGST = 4'h7;
   localparam [3:0] GAME_MAZINGER = 4'h8;
   localparam [3:0] GAME_AGALLET  = 4'h9;
+  localparam [3:0] GAME_SAILORMN = 4'hA;
 
   localparam [1:0] SOUND_DEVICE_YMZ280B  = 2'h1;
   localparam [1:0] SOUND_DEVICE_OKIM6259 = 2'h2;
@@ -45,8 +47,10 @@ module CaveBoardProfile(
   assign game_is_hotdogstorm = game_index == GAME_HOTDOGST;
   assign game_is_mazinger = game_index == GAME_MAZINGER;
   assign game_is_airgallet = game_index == GAME_AGALLET;
+  assign game_is_sailormoon = game_index == GAME_SAILORMN;
 
-  assign board_uses_z80_sound = game_is_hotdogstorm | game_is_mazinger | game_is_airgallet;
+  assign board_uses_z80_sound =
+    game_is_hotdogstorm | game_is_mazinger | game_is_airgallet | game_is_sailormoon;
   assign board_is_vertical_clockwise = game_is_hotdogstorm | game_is_mazinger | game_is_airgallet;
 
   assign sound_is_ymz280b = sound_device == SOUND_DEVICE_YMZ280B;
