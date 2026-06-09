@@ -100,9 +100,10 @@ module Main(
   output [15:0]  io_soundCtrl_data,
   output         io_soundCtrl_reply_rd,
   input  [15:0]  io_soundCtrl_reply,
+  input          io_soundCtrl_reply_empty,
   input          io_soundCtrl_irq,
   output         io_progRom_rd,
-  output [19:0]  io_progRom_addr,
+  output [21:0]  io_progRom_addr,
   input  [15:0]  io_progRom_dout,
   input          io_progRom_valid,
   output         io_eeprom_rd,
@@ -112,6 +113,7 @@ module Main(
   input  [15:0]  io_eeprom_dout,
   input          io_eeprom_wait_n,
   input          io_eeprom_valid,
+  output         io_sailorMoonTilebank,
   output         io_spriteFrameBufferSwap,
   output [63:0] io_debug_pipeline,
   output [63:0] io_debug_cpu,
@@ -225,6 +227,7 @@ module Main(
   reg         unknownIrq;
   reg  [15:0] dinReg;
   reg         dtackReg;
+  reg         sailorMoonTilebankReg;
   wire        readStrobe;
   wire        writeStrobe;
   wire        eepromSerialCs;
@@ -297,6 +300,7 @@ module Main(
     videoVBlankRising & (gameIsHotdogStorm | gameIsMazinger | pauseActive);
   wire [23:0] cpuByteAddr;
   wire [1:0]  mainRam_io_mask = {_cpu_io_uds, _cpu_io_lds};
+  wire [7:0]  cpuWriteByte = _cpu_io_uds ? _cpu_io_dout[15:8] : _cpu_io_dout[7:0];
 
   CaveVBlankTracker vblankTracker(
     .clock   (clock),
@@ -745,6 +749,7 @@ module Main(
     .layer1_vram8_data    (airGalletLayer1VramData),
     .layer2_vram8_data    (airGalletLayer2VramData),
     .sound_data           (io_soundCtrl_reply),
+    .sound_reply_empty    (io_soundCtrl_reply_empty),
     .sprite_ram_data      (_spriteRam_io_portA_dout),
     .work_ram_data        (airGalletWorkRamData),
     .main_ram_data        (_mainRam_io_dout),
@@ -1023,6 +1028,16 @@ module Main(
   reg  [7:0]  airGalletDebugLayer2Seen;
   reg         airGalletDebugFirstUnmappedValid;
   reg  [23:0] airGalletDebugFirstUnmappedAddr;
+  reg  [7:0]  airGalletDebugLastSelectExt;
+  reg  [7:0]  airGalletDebugSelectExtSeen;
+  reg  [7:0]  airGalletDebugLastControl;
+  reg  [7:0]  airGalletDebugControlSeen;
+  reg  [7:0]  airGalletDebugAddrChangeCount;
+  reg  [7:0]  airGalletDebugSameAddrCount;
+  reg  [23:0] airGalletDebugLastNoDtackAddr;
+  reg  [7:0]  airGalletDebugLastNoDtackSelect;
+  reg  [7:0]  airGalletDebugLastNoDtackSelectExt;
+  reg  [7:0]  airGalletDebugLastNoDtackControl;
 
   wire [7:0] airGalletDebugPipelineRow0 = {
     airGalletCpuByteAddr != airGalletDebugPrevAddr,
@@ -1043,6 +1058,24 @@ module Main(
     airGalletLayer0Vram8Select,
     airGalletLayer1Vram8Select,
     airGalletLayer2Vram8Select
+  };
+  wire [7:0] airGalletDebugSelectExtNow = {
+    airGalletWorkRamSelect,
+    airGalletLayer0RegsSelect,
+    airGalletLayer1RegsSelect,
+    airGalletLayer2RegsSelect,
+    airGalletSpriteRegsWrite,
+    airGalletSoundWrite | airGalletSoundRead | airGalletSoundFlagsRead,
+    airGalletInput0Read | airGalletInput1Read,
+    airGalletOpenBusSelect
+  };
+  wire [7:0] airGalletDebugControlNow = {
+    _cpu_io_fc,
+    _cpu_io_as,
+    _cpu_io_rw,
+    _cpu_io_uds,
+    _cpu_io_lds,
+    airGalletDtack
   };
   wire [7:0] airGalletDebugReadNow = {
     airGalletInput0Read,
@@ -1130,55 +1163,59 @@ module Main(
     airGalletDebugIrqNow,
     airGalletDebugWriteNow,
     airGalletDebugReadNow,
+    airGalletDebugSelectExtNow,
     airGalletDebugSelectNow,
-    airGalletDebugPipelineRow0,
-    io_soundCtrl_reply[7:0]
+    airGalletDebugPipelineRow0
   };
   wire [63:0] airGalletDebugCpuBits = {
-    airGalletDebugIrqSeen,
-    airGalletDebugWriteSeen,
-    airGalletDebugReadSeen,
-    airGalletDebugLastSelect,
-    airGalletDebugLastAddr[7:0],
-    airGalletDebugLastAddr[15:8],
+    airGalletDebugLastNoDtackAddr[23:16],
+    airGalletDebugLastNoDtackAddr[15:8],
+    airGalletDebugLastNoDtackAddr[7:0],
     airGalletDebugLastAddr[23:16],
-    airGalletDebugMilestones
+    airGalletDebugLastAddr[15:8],
+    airGalletDebugLastAddr[7:0],
+    airGalletDebugLastNoDtackSelect,
+    airGalletDebugLastNoDtackSelectExt
   };
   wire [63:0] airGalletDebugWriteBits = {
-    airGalletDebugLastDout[7:0],
     airGalletDebugLastDout[15:8],
-    airGalletDebugLastDin[7:0],
+    airGalletDebugLastDout[7:0],
     airGalletDebugLastDin[15:8],
-    airGalletDebugWriteSeen,
-    airGalletDebugReadSeen,
+    airGalletDebugLastDin[7:0],
     airGalletDebugLastSelect,
-    {7'h0, airGalletDebugFirstUnmappedValid}
+    airGalletDebugLastSelectExt,
+    airGalletDebugReadSeen,
+    airGalletDebugWriteSeen
   };
   wire [63:0] airGalletDebugDataBits = {
-    airGalletDebugFirstUnmappedAddr[7:0],
-    airGalletDebugFirstUnmappedAddr[15:8],
     airGalletDebugFirstUnmappedAddr[23:16],
-    airGalletDebugLastProgAddr[7:0],
-    airGalletDebugLastProgAddr[15:8],
+    airGalletDebugFirstUnmappedAddr[15:8],
+    airGalletDebugFirstUnmappedAddr[7:0],
     airGalletDebugLastProgAddr[23:16],
+    airGalletDebugLastProgAddr[15:8],
+    airGalletDebugLastProgAddr[7:0],
     airGalletDebugMilestones,
-    io_soundCtrl_reply[7:0]
+    {7'h0, airGalletDebugFirstUnmappedValid}
   };
   wire [63:0] airGalletDebugLiveBits = {
     airGalletDebugLayerStatus,
-    airGalletDebugLayer2Seen,
-    airGalletDebugLayer1Seen,
-    airGalletDebugLayer0Seen,
     airGalletDebugLayer2Now,
-    airGalletDebugLayer1Now,
-    airGalletDebugLayer0Now,
-    airGalletDebugLastAddr[7:0]
+    airGalletDebugLayer2Seen,
+    airGalletDebugSelectExtSeen,
+    airGalletDebugLastControl,
+    airGalletDebugLastNoDtackControl,
+    airGalletDebugMilestones,
+    airGalletDebugIrqSeen
   };
   wire [63:0] airGalletDebugPaletteBits = {
-    airGalletDebugLastDout,
-    airGalletDebugLastDin,
-    airGalletDebugLastAddr[15:0],
-    airGalletDebugLastProgAddr[15:0]
+    _layerRegs_2_io_regs_0[15:8],
+    _layerRegs_2_io_regs_0[7:0],
+    _layerRegs_2_io_regs_1[15:8],
+    _layerRegs_2_io_regs_1[7:0],
+    _layerRegs_2_io_regs_2[15:8],
+    _layerRegs_2_io_regs_2[7:0],
+    airGalletDebugLayer0Now,
+    airGalletDebugLayer1Now
   };
 `endif
   wire        cs_1 = cpuByteAddr > 24'h10FFFF & cpuByteAddr < 24'h200000;
@@ -1972,6 +2009,15 @@ module Main(
     gameIsAirFamily ? airGalletEepromWrite
       : gameIsMazinger ? mazingerEepromWrite
       : gameIsUopoko ? cs_231 & writeStrobe : _GEN_430;
+  assign io_sailorMoonTilebank = sailorMoonTilebankReg;
+
+  always @(posedge clock) begin
+    if (reset | ~gameIsSailorMoon)
+      sailorMoonTilebankReg <= 1'b0;
+    else if (airGalletEepromWrite)
+      sailorMoonTilebankReg <= cpuWriteByte[0];
+  end
+
   wire        cs_120 = cpuByteAddr > 24'h5017FF & cpuByteAddr < 24'h504000;
   wire        cs_122 = cpuByteAddr > 24'h507FFF & cpuByteAddr < 24'h510000;
   wire        cs_125 = cpuByteAddr > 24'h6017FF & cpuByteAddr < 24'h604000;
@@ -4582,7 +4628,7 @@ module Main(
           mazingerDebugExtraChecksumValid <= 1'b1;
       end
       if (mazingerProgRomReady) begin
-        mazingerDebugLastProgAddr <= {4'h0, io_progRom_addr};
+        mazingerDebugLastProgAddr <= {2'h0, io_progRom_addr};
         case (io_progRom_addr)
           20'h001D94:
             mazingerDebugMilestones[0] <= 1'b1;
@@ -4611,7 +4657,7 @@ module Main(
     end
   end
   always @(posedge clock) begin
-    if (reset | ~gameIsAirGallet) begin
+    if (reset | ~gameIsAirFamily) begin
       airGalletDebugSeen <= 64'd0;
       airGalletDebugLastAddr <= 24'd0;
       airGalletDebugPrevAddr <= 24'd0;
@@ -4628,6 +4674,16 @@ module Main(
       airGalletDebugLayer2Seen <= 8'd0;
       airGalletDebugFirstUnmappedValid <= 1'b0;
       airGalletDebugFirstUnmappedAddr <= 24'd0;
+      airGalletDebugLastSelectExt <= 8'd0;
+      airGalletDebugSelectExtSeen <= 8'd0;
+      airGalletDebugLastControl <= 8'd0;
+      airGalletDebugControlSeen <= 8'd0;
+      airGalletDebugAddrChangeCount <= 8'd0;
+      airGalletDebugSameAddrCount <= 8'd0;
+      airGalletDebugLastNoDtackAddr <= 24'd0;
+      airGalletDebugLastNoDtackSelect <= 8'd0;
+      airGalletDebugLastNoDtackSelectExt <= 8'd0;
+      airGalletDebugLastNoDtackControl <= 8'd0;
     end
     else begin
       airGalletDebugSeen <= airGalletDebugSeen | airGalletDebugEventBits;
@@ -4637,11 +4693,25 @@ module Main(
       airGalletDebugLayer0Seen <= airGalletDebugLayer0Seen | airGalletDebugLayer0Now;
       airGalletDebugLayer1Seen <= airGalletDebugLayer1Seen | airGalletDebugLayer1Now;
       airGalletDebugLayer2Seen <= airGalletDebugLayer2Seen | airGalletDebugLayer2Now;
+      airGalletDebugSelectExtSeen <= airGalletDebugSelectExtSeen | airGalletDebugSelectExtNow;
+      airGalletDebugControlSeen <= airGalletDebugControlSeen | airGalletDebugControlNow;
 
       if (airGalletCycle) begin
+        if (airGalletCpuByteAddr != airGalletDebugLastAddr)
+          airGalletDebugAddrChangeCount <= airGalletDebugAddrChangeCount + 8'd1;
+        else
+          airGalletDebugSameAddrCount <= airGalletDebugSameAddrCount + 8'd1;
         airGalletDebugPrevAddr <= airGalletDebugLastAddr;
         airGalletDebugLastAddr <= airGalletCpuByteAddr;
         airGalletDebugLastSelect <= airGalletDebugSelectNow;
+        airGalletDebugLastSelectExt <= airGalletDebugSelectExtNow;
+        airGalletDebugLastControl <= airGalletDebugControlNow;
+        if (~airGalletDtack) begin
+          airGalletDebugLastNoDtackAddr <= airGalletCpuByteAddr;
+          airGalletDebugLastNoDtackSelect <= airGalletDebugSelectNow;
+          airGalletDebugLastNoDtackSelectExt <= airGalletDebugSelectExtNow;
+          airGalletDebugLastNoDtackControl <= airGalletDebugControlNow;
+        end
       end
 
       if (readStrobe | writeStrobe)
@@ -4650,7 +4720,7 @@ module Main(
         airGalletDebugLastDin <= dinReg;
 
       if (io_progRom_rd & io_progRom_valid) begin
-        airGalletDebugLastProgAddr <= {4'h0, io_progRom_addr};
+        airGalletDebugLastProgAddr <= {2'h0, io_progRom_addr};
         airGalletDebugMilestones[0] <= 1'b1;
       end
       if (airGalletSoundWrite)
@@ -5162,22 +5232,22 @@ module Main(
   assign io_gpuMem_sprite_regs_hFlip = _spriteRegs_io_regs_0[15];
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   assign io_debug_pipeline =
-    gameIsAirGallet ? airGalletDebugSeen :
+    gameIsAirFamily ? airGalletDebugSeen :
     gameIsMazinger ? mazingerDebugSeen : 64'd0;
   assign io_debug_cpu =
-    gameIsAirGallet ? airGalletDebugCpuBits :
+    gameIsAirFamily ? airGalletDebugCpuBits :
     gameIsMazinger ? mazingerDebugCpuBits : 64'd0;
   assign io_debug_writes =
-    gameIsAirGallet ? airGalletDebugWriteBits :
+    gameIsAirFamily ? airGalletDebugWriteBits :
     gameIsMazinger ? mazingerDebugWriteBits : 64'd0;
   assign io_debug_data =
-    gameIsAirGallet ? airGalletDebugDataBits :
+    gameIsAirFamily ? airGalletDebugDataBits :
     gameIsMazinger ? mazingerDebugDataBits : 64'd0;
   assign io_debug_live =
-    gameIsAirGallet ? airGalletDebugLiveBits :
+    gameIsAirFamily ? airGalletDebugLiveBits :
     gameIsMazinger ? mazingerDebugLiveBits : 64'd0;
   assign io_debug_palette =
-    gameIsAirGallet ? airGalletDebugPaletteBits :
+    gameIsAirFamily ? airGalletDebugPaletteBits :
     gameIsMazinger ? mazingerDebugPaletteBits : 64'd0;
 `else
   assign io_debug_pipeline = 64'd0;
@@ -5208,10 +5278,15 @@ module Main(
     gameIsAirFamily ? airGalletProgRomRead
       : gameIsMazinger ? mazingerProgRomRead
       : gameIsUopoko ? cs_214 & readStrobe : _GEN_189;
+  wire [21:0] sailorMoonExtraProgRomAddr = airGalletCpuByteAddr[21:0] - 22'h180000;
   assign io_progRom_addr =
-    (gameIsMazinger & mazingerExtraRomSelect)
-      ? {1'b1, cpuByteAddr[18:0]}
-      : {_cpu_io_addr[18:0], 1'b0};
+    (gameIsSailorMoon & airGalletExtraRomSelect)
+      ? sailorMoonExtraProgRomAddr
+      : gameIsAirFamily
+      ? airGalletCpuByteAddr[21:0]
+      : (gameIsMazinger & mazingerExtraRomSelect)
+      ? {2'b00, 1'b1, cpuByteAddr[18:0]}
+      : {2'b00, _cpu_io_addr[18:0], 1'b0};
   assign io_spriteFrameBufferSwap =
     gameIsAirFamily ? airGalletSpriteSwapWrite
       : gameIsMazinger ? videoVBlankRising

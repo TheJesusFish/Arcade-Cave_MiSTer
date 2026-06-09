@@ -22,6 +22,7 @@ module AirGalletMainMap(
   input  [15:0] layer1_vram8_data,
   input  [15:0] layer2_vram8_data,
   input  [15:0] sound_data,
+  input         sound_reply_empty,
   input  [15:0] sprite_ram_data,
   input  [15:0] work_ram_data,
   input  [15:0] main_ram_data,
@@ -87,9 +88,17 @@ module AirGalletMainMap(
   wire        progRomAccess;
   wire        knownSelect;
   wire        dataStrobe;
+  wire        layer0RegsDataSelect;
+  wire        layer1RegsDataSelect;
+  wire        layer2RegsDataSelect;
+  wire        layerRegsMirrorSelect;
 
+  wire [15:0] irqBaseCause =
+    16'h0003 ^ (video_irq ? 16'h0001 : 16'h0000) ^ (unknown_irq ? 16'h0002 : 16'h0000);
   wire [15:0] irqCause =
-    {13'h0, ~((irq_word_offset == 2'h0) & agallet_irq), ~unknown_irq, ~video_irq};
+    irq_word_offset == 2'h0
+      ? ((irqBaseCause & 16'hfffb) | (agallet_irq ? 16'h0000 : 16'h0004))
+      : irqBaseCause;
 
   AirGalletMainDecoder decoder(
     .game_active         (game_active),
@@ -123,6 +132,10 @@ module AirGalletMainMap(
     .layer0_regs_select  (layer0_regs_select),
     .layer1_regs_select  (layer1_regs_select),
     .layer2_regs_select  (layer2_regs_select),
+    .layer0_regs_data_select (layer0RegsDataSelect),
+    .layer1_regs_data_select (layer1RegsDataSelect),
+    .layer2_regs_data_select (layer2RegsDataSelect),
+    .layer_regs_mirror_select (layerRegsMirrorSelect),
     .sprite_regs_select  (),
     .irq_select          (irqSelect),
     .irq_read            (irq_read),
@@ -167,9 +180,9 @@ module AirGalletMainMap(
     .input1_read         (input1_read),
     .input0_read         (input0_read),
     .palette_select      (palette_select),
-    .layer0_regs_select  (layer0_regs_select),
-    .layer1_regs_select  (layer1_regs_select),
-    .layer2_regs_select  (layer2_regs_select),
+    .layer0_regs_select  (layer0RegsDataSelect),
+    .layer1_regs_select  (layer1RegsDataSelect),
+    .layer2_regs_select  (layer2RegsDataSelect),
     .layer0_vram8_select (layer0_vram8_select),
     .layer1_vram8_select (layer1_vram8_select),
     .layer2_vram8_select (layer2_vram8_select),
@@ -182,7 +195,7 @@ module AirGalletMainMap(
     .extra_rom_has_data  (extra_rom_has_data),
     .extra_rom_read      (extra_rom_select & read_strobe),
     .prog_rom_ready      (prog_rom_ready),
-    .open_bus_read       (open_bus_select & read_strobe),
+    .open_bus_read       ((open_bus_select | layerRegsMirrorSelect) & read_strobe),
     .input1_data         (input1_data),
     .input0_data         (input0_data),
     .palette_data        (palette_data),
@@ -192,7 +205,7 @@ module AirGalletMainMap(
     .layer0_vram8_data   (layer0_vram8_data),
     .layer1_vram8_data   (layer1_vram8_data),
     .layer2_vram8_data   (layer2_vram8_data),
-    .sound_flags_data    (sound_data == 16'h00ff ? 16'h0002 : 16'h0000),
+    .sound_flags_data    (sound_reply_empty ? 16'h0002 : 16'h0000),
     .sound_data          (sound_data),
     .irq_data            (irqCause),
     .sprite_ram_data     (sprite_ram_data),

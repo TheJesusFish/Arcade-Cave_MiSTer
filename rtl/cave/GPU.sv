@@ -88,6 +88,7 @@ module GPU(
   input  [1:0]   io_gameConfig_layer_2_paletteBank,
   input          io_gameConfig_maskLeftColumn,
   input          io_gameConfig_airLayer2Direct6bpp,
+  input          io_gameConfig_sailorMoonTilebank,
   input          io_options_rotate,
   input          io_options_rotateClockwise,
   input          io_options_flipVideo,
@@ -127,6 +128,8 @@ module GPU(
   wire [1:0]  layer2PenPriority;
   wire [5:0]  layer2PenPalette;
   wire [7:0]  layer2PenColor;
+  reg         sailorMoonTilebankSync0;
+  reg         sailorMoonTilebankSync1;
 
   wire [1:0]  spritePenPriority = io_spriteLineBuffer_dout[15:14];
   wire [5:0]  spritePenPalette = io_spriteLineBuffer_dout[13:8];
@@ -179,6 +182,17 @@ module GPU(
   reg [31:0] systemFramebufferDinReg;
 
   wire activeDisplayPixel = io_video_clockEnable & io_video_displayEnable;
+
+  always @(posedge io_videoClock) begin
+    if (reset) begin
+      sailorMoonTilebankSync0 <= 1'b0;
+      sailorMoonTilebankSync1 <= 1'b0;
+    end else begin
+      sailorMoonTilebankSync0 <= io_gameConfig_sailorMoonTilebank;
+      sailorMoonTilebankSync1 <= sailorMoonTilebankSync0;
+    end
+  end
+
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   wire [3:0]  mixerDebugSelectedPen;
   wire [5:0]  mixerDebugSelectedPalette;
@@ -424,6 +438,7 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (1'b0),
+    .io_sailorMoonTilebank        (1'b0),
     .io_pen_priority              (layer0PenPriority),
     .io_pen_palette               (layer0PenPalette),
     .io_pen_color                 (layer0PenColor)
@@ -462,6 +477,7 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (1'b0),
+    .io_sailorMoonTilebank        (1'b0),
     .io_pen_priority              (layer1PenPriority),
     .io_pen_palette               (layer1PenPalette),
     .io_pen_color                 (layer1PenColor)
@@ -500,6 +516,7 @@ module GPU(
     .io_spriteOffset_x            (io_spriteCtrl_regs_offset_x),
     .io_spriteOffset_y            (io_spriteCtrl_regs_offset_y),
     .io_direct6bppPixels          (io_gameConfig_airLayer2Direct6bpp),
+    .io_sailorMoonTilebank        (sailorMoonTilebankSync1),
     .io_pen_priority              (layer2PenPriority),
     .io_pen_palette               (layer2PenPalette),
     .io_pen_color                 (layer2PenColor)

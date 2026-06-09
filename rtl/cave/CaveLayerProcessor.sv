@@ -35,6 +35,7 @@ module CaveLayerProcessor #(
   input  [8:0]  io_spriteOffset_x,
   input  [8:0]  io_spriteOffset_y,
   input         io_direct6bppPixels,
+  input         io_sailorMoonTilebank,
   output [1:0]  io_pen_priority,
   output [5:0]  io_pen_palette,
   output [7:0]  io_pen_color
@@ -44,7 +45,7 @@ module CaveLayerProcessor #(
 
   reg [1:0]  tileReg_priority;
   reg [5:0]  tileReg_colorCode;
-  reg [17:0] tileReg_code;
+  reg [18:0] tileReg_code;
   reg [1:0]  priorityReg;
   reg [5:0]  colorReg;
   reg [7:0]  pixReg_0;
@@ -99,6 +100,12 @@ module CaveLayerProcessor #(
   wire format6bpp = io_ctrl_format == 2'h2;
   wire format8bpp = &io_ctrl_format;
   wire formatLinearTile = format6bpp | format8bpp;
+  wire [17:0] tileCode8x8Raw = {io_ctrl_vram8x8_dout[1:0], io_ctrl_vram8x8_dout[31:16]};
+  wire        sailorMoonTilebankHit =
+    io_sailorMoonTilebank & ~io_ctrl_regs_tileSize & (tileCode8x8Raw < 18'h10000);
+  wire [18:0] tileCode8x8 =
+    sailorMoonTilebankHit ? ({1'b0, tileCode8x8Raw} + 19'h40000) : {1'b0, tileCode8x8Raw};
+  wire [18:0] tileCode16x16 = {3'b000, io_ctrl_vram16x16_dout[31:16]};
   wire [31:0] pixels4bppBits =
     tileOffset_y[0] ? io_ctrl_tileRom_dout[31:0] : io_ctrl_tileRom_dout[63:32];
   wire [7:0] pixel8bpp_0 = {io_ctrl_tileRom_dout[55:52], io_ctrl_tileRom_dout[63:60]};
@@ -146,13 +153,13 @@ module CaveLayerProcessor #(
     tileRomAddr = 26'h0000000;
 
     if (io_ctrl_regs_tileSize & formatLinearTile)
-      tileRomAddr = {tileReg_code, tileOffset_y[3], ~tileOffset_x[3], tileOffset_y[2:0], 3'b000};
+      tileRomAddr = {tileReg_code[17:0], tileOffset_y[3], ~tileOffset_x[3], tileOffset_y[2:0], 3'b000};
     if (io_ctrl_regs_tileSize & format4bpp)
-      tileRomAddr = {1'b0, tileReg_code, tileOffset_y[3], ~tileOffset_x[3], tileOffset_y[2:1], 3'b000};
+      tileRomAddr = {1'b0, tileReg_code[17:0], tileOffset_y[3], ~tileOffset_x[3], tileOffset_y[2:1], 3'b000};
     if (~io_ctrl_regs_tileSize & formatLinearTile)
-      tileRomAddr = {2'b00, tileReg_code, tileOffset_y[2:0], 3'b000};
+      tileRomAddr = {1'b0, tileReg_code, tileOffset_y[2:0], 3'b000};
     if (~io_ctrl_regs_tileSize & format4bpp)
-      tileRomAddr = {3'b000, tileReg_code, tileOffset_y[2:1], 3'b000};
+      tileRomAddr = {3'b000, tileReg_code[17:0], tileOffset_y[2:1], 3'b000};
   end
 
   wire direct6bppTileFetch = io_direct6bppPixels & format6bpp;
@@ -161,7 +168,7 @@ module CaveLayerProcessor #(
     & (
       direct6bppTileFetch
         ? (io_ctrl_regs_flipX
-           ? tileOffset_x == 4'h3
+           ? tileOffset_x == 4'h7
            : (io_ctrl_regs_tileSize ? tileOffset_x == 4'h7 : tileOffset_x == 4'h0))
         : (io_ctrl_regs_flipX
            ? tileOffset_x == 4'h5
@@ -188,9 +195,7 @@ module CaveLayerProcessor #(
       tileReg_colorCode <=
         io_ctrl_regs_tileSize ? io_ctrl_vram16x16_dout[13:8] : io_ctrl_vram8x8_dout[13:8];
       tileReg_code <=
-        io_ctrl_regs_tileSize
-          ? {2'b00, io_ctrl_vram16x16_dout[31:16]}
-          : {io_ctrl_vram8x8_dout[1:0], io_ctrl_vram8x8_dout[31:16]};
+        io_ctrl_regs_tileSize ? tileCode16x16 : tileCode8x8;
     end
 
     if (latchColor) begin

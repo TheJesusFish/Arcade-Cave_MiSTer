@@ -5,6 +5,7 @@
 module AudioMixer (
   input         clock,
   input         io_airgallet,
+  input         io_sailormoon,
   input         io_mazinger,
   input  [13:0] io_in_4,
   input  [13:0] io_in_3,
@@ -57,9 +58,21 @@ module AudioMixer (
   wire signed [28:0] air_sfx_gain =
     (air_sfx_sample <<< 6)
     + (air_sfx_sample <<< 4);                             // x80
+  wire signed [28:0] sailor_fm_gain =
+    air_fm_sample <<< 3;                                  // x8
+  wire signed [28:0] sailor_bgm_gain =
+    (air_bgm_smoothed <<< 6)
+    + (air_bgm_smoothed <<< 4)
+    + (air_bgm_smoothed <<< 3)
+    + (air_bgm_smoothed <<< 1);                           // x90
+  wire signed [28:0] sailor_sfx_gain = air_sfx_gain;       // x80
   wire signed [28:0] air_mix_sum =
     air_fm_gain + air_bgm_gain + air_sfx_gain;
-  wire signed [28:0] air_mix_ext_next = air_mix_sum >>> 1;
+  wire signed [28:0] sailor_mix_sum =
+    sailor_fm_gain + sailor_bgm_gain + sailor_sfx_gain;
+  wire signed [28:0] air_family_mix_sum =
+    io_sailormoon ? sailor_mix_sum : air_mix_sum;
+  wire signed [28:0] air_mix_ext_next = air_family_mix_sum >>> 1;
   wire signed [28:0] mazinger_boosted_mix_sum =
     (mazinger_mix_ext <<< 1) + (mazinger_mix_ext >>> 2);
   reg signed [28:0] air_mix_ext_reg;

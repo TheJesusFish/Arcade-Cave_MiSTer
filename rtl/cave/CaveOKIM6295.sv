@@ -15,6 +15,7 @@ module CaveOKIM6295 #(
   output [7:0]  io_cpu_dout,
   output        io_rom_rd,
   output [17:0] io_rom_addr,
+  input  [24:0] io_rom_cache_addr,
   input  [7:0]  io_rom_dout,
   input         io_rom_valid,
   output        io_audio_valid,
@@ -24,11 +25,11 @@ module CaveOKIM6295 #(
   reg [15:0] cenAccumulator;
   reg [3:0]  writeHold;
   reg [7:0]  writeDataReg;
-  reg [17:0] requestedRomAddr;
+  reg [24:0] requestedRomAddr;
   reg [7:0]  romDataReg;
   reg        romDataReady;
   wire [16:0] cenNext = {1'b0, cenAccumulator} + io_cen_step;
-  wire        romAddrChanged = io_rom_addr != requestedRomAddr;
+  wire        romAddrChanged = io_rom_cache_addr != requestedRomAddr;
   wire        bufferRomForWait = io_stretch_cpu_wr;
   wire        chipRomOk = (io_wait_for_rom & bufferRomForWait) ? romDataReady : io_rom_valid;
   wire [7:0]  chipRomData = (io_wait_for_rom & bufferRomForWait) ? romDataReg : io_rom_dout;
@@ -46,7 +47,7 @@ module CaveOKIM6295 #(
     if (reset) begin
       cenAccumulator <= 16'h0;
       adpcm_cen <= 1'b0;
-      requestedRomAddr <= 18'h0;
+      requestedRomAddr <= 25'h0;
       romDataReg <= 8'h00;
       romDataReady <= 1'b0;
     end
@@ -60,7 +61,7 @@ module CaveOKIM6295 #(
 
     if (~reset) begin
       if (romAddrChanged) begin
-        requestedRomAddr <= io_rom_addr;
+        requestedRomAddr <= io_rom_cache_addr;
         romDataReady <= 1'b0;
       end
       else if (io_rom_valid) begin

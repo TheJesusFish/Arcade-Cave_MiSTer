@@ -241,6 +241,7 @@ wire [23:0] rgb;
 wire hsync, vsync;
 wire hblank, vblank;
 wire core_video_rotated;
+wire core_video_change_mode;
 wire [1:0] aspect_ratio = status[2:1];
 wire orientation = core_video_rotated;
 wire [2:0] fx = status[7:5];
@@ -295,13 +296,12 @@ video_mixer #(.LINE_LENGTH(388), .HALF_DEPTH(0), .GAMMA(1)) video_mixer (
   .VGA_DE(VGA_DE)
 );
 
-// Update HPS when video mode changes
-reg [1:0] video_status;
+// Update HPS when the core reloads or changes video timing.
+reg core_video_change_mode_d = 1'b0;
 always @(posedge clk_sys) begin
-    if (video_status != status[8]) begin
-        video_status <= status[8];
+    core_video_change_mode_d <= core_video_change_mode;
+    if (core_video_change_mode & ~core_video_change_mode_d)
         new_vmode <= ~new_vmode;
-    end
 end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -444,7 +444,7 @@ Cave cave (
   .player_1_pause(player_2_pause),
   // Video signals
   .video_clockEnable(ce_pix),
-  .video_changeMode(0),
+  .video_changeMode(core_video_change_mode),
   .video_rotated(core_video_rotated),
   .video_hSync(hsync),
   .video_vSync(vsync),

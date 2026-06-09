@@ -27,7 +27,7 @@ module MemSys(
   output        io_prog_nvram_valid,
   input         io_prog_done,
   input         io_progRom_rd,
-  input  [19:0] io_progRom_addr,
+  input  [21:0] io_progRom_addr,
   output [15:0] io_progRom_dout,
   output        io_progRom_wait_n,
   output        io_progRom_valid,
@@ -111,7 +111,7 @@ module MemSys(
   output        io_ready
 );
   localparam [31:0] IOCTL_DOWNLOAD_BASE_ADDR = 32'h3000_0000;
-  localparam [31:0] MAZINGER_SPRITE_DECRYPT_OFFSET = 32'h0100_0000;
+  localparam [31:0] DECRYPTED_SPRITE_ROM_OFFSET = 32'h0100_0000;
 
   reg readyEnableReg;
   reg copyDmaBusyReg;
@@ -157,6 +157,20 @@ module MemSys(
   wire [7:0]  decryptDmaBurstLength;
   wire        decryptDmaBurstDone;
   wire        decryptDmaDone = ~decryptDmaBusy & decryptDmaBusyReg;
+  wire        mazingerDecryptDmaBusy;
+  wire        mazingerDecryptDmaRd;
+  wire        mazingerDecryptDmaWr;
+  wire [31:0] mazingerDecryptDmaAddr;
+  wire [7:0]  mazingerDecryptDmaMask;
+  wire [63:0] mazingerDecryptDmaDin;
+  wire [7:0]  mazingerDecryptDmaBurstLength;
+  wire        sailorMoonDecryptDmaBusy;
+  wire        sailorMoonDecryptDmaRd;
+  wire        sailorMoonDecryptDmaWr;
+  wire [31:0] sailorMoonDecryptDmaAddr;
+  wire [7:0]  sailorMoonDecryptDmaMask;
+  wire [63:0] sailorMoonDecryptDmaDin;
+  wire [7:0]  sailorMoonDecryptDmaBurstLength;
 
   wire        progRomCacheOutRd;
   wire [24:0] progRomCacheOutAddr;
@@ -219,13 +233,15 @@ module MemSys(
   wire        gameIsAirGallet;
   wire        gameIsSailorMoon;
   wire        copyDmaStart = io_prog_done & ~copyDmaStartedReg;
-  wire        decryptDmaStart = copyDmaDoneReg & gameIsMazinger & ~decryptDmaStartedReg;
+  wire        gameUsesSpriteDecrypt = gameIsMazinger | gameIsSailorMoon;
+  wire        decryptDmaStart =
+    copyDmaDoneReg & gameUsesSpriteDecrypt & ~decryptDmaStartedReg;
   wire [31:0] ddrDownloadAddr = ddrDownloadBufferOutAddr + IOCTL_DOWNLOAD_BASE_ADDR;
   wire [31:0] ddrCopyDmaAddr = copyDmaInAddr + IOCTL_DOWNLOAD_BASE_ADDR;
   wire [31:0] spriteRomReadOffset =
-    gameIsMazinger ? MAZINGER_SPRITE_DECRYPT_OFFSET : io_gameConfig_sprite_romOffset;
+    gameUsesSpriteDecrypt ? DECRYPTED_SPRITE_ROM_OFFSET : io_gameConfig_sprite_romOffset;
   wire [31:0] spriteTileRomLocalAddr =
-    gameIsMazinger ? {10'h000, io_spriteTileRom_addr[21:0]} : io_spriteTileRom_addr;
+    gameUsesSpriteDecrypt ? {10'h000, io_spriteTileRom_addr[21:0]} : io_spriteTileRom_addr;
   wire [31:0] ddrSpriteTileRomAddr =
     spriteTileRomLocalAddr + (spriteRomReadOffset + IOCTL_DOWNLOAD_BASE_ADDR);
 
@@ -289,7 +305,7 @@ module MemSys(
         decryptDmaDoneReg <= 1'b1;
 
       readyEnableReg <=
-        readyEnableReg | (copyDmaDoneReg & (~gameIsMazinger | decryptDmaDoneReg));
+        readyEnableReg | (copyDmaDoneReg & (~gameUsesSpriteDecrypt | decryptDmaDoneReg));
     end
   end
 
@@ -339,28 +355,62 @@ module MemSys(
   MazingerSpriteDecryptDMA mazingerSpriteDecryptDma (
     .clock                (clock),
     .reset                (reset),
-    .io_start             (decryptDmaStart),
-    .io_busy              (decryptDmaBusy),
+    .io_start             (decryptDmaStart & gameIsMazinger),
+    .io_busy              (mazingerDecryptDmaBusy),
     .io_src_base          (io_gameConfig_sprite_romOffset + IOCTL_DOWNLOAD_BASE_ADDR),
-    .io_dst_base          (MAZINGER_SPRITE_DECRYPT_OFFSET + IOCTL_DOWNLOAD_BASE_ADDR),
-    .io_mem_rd            (decryptDmaRd),
-    .io_mem_wr            (decryptDmaWr),
-    .io_mem_addr          (decryptDmaAddr),
-    .io_mem_mask          (decryptDmaMask),
-    .io_mem_din           (decryptDmaDin),
+    .io_dst_base          (DECRYPTED_SPRITE_ROM_OFFSET + IOCTL_DOWNLOAD_BASE_ADDR),
+    .io_mem_rd            (mazingerDecryptDmaRd),
+    .io_mem_wr            (mazingerDecryptDmaWr),
+    .io_mem_addr          (mazingerDecryptDmaAddr),
+    .io_mem_mask          (mazingerDecryptDmaMask),
+    .io_mem_din           (mazingerDecryptDmaDin),
     .io_mem_dout          (decryptDmaDout),
     .io_mem_wait_n        (decryptDmaWaitN),
     .io_mem_valid         (decryptDmaValid),
-    .io_mem_burstLength   (decryptDmaBurstLength),
+    .io_mem_burstLength   (mazingerDecryptDmaBurstLength),
     .io_mem_burstDone     (decryptDmaBurstDone)
   );
 
+  SailorMoonSpriteDecryptDMA sailorMoonSpriteDecryptDma (
+    .clock                (clock),
+    .reset                (reset),
+    .io_start             (decryptDmaStart & gameIsSailorMoon),
+    .io_busy              (sailorMoonDecryptDmaBusy),
+    .io_src_base          (io_gameConfig_sprite_romOffset + IOCTL_DOWNLOAD_BASE_ADDR),
+    .io_dst_base          (DECRYPTED_SPRITE_ROM_OFFSET + IOCTL_DOWNLOAD_BASE_ADDR),
+    .io_mem_rd            (sailorMoonDecryptDmaRd),
+    .io_mem_wr            (sailorMoonDecryptDmaWr),
+    .io_mem_addr          (sailorMoonDecryptDmaAddr),
+    .io_mem_mask          (sailorMoonDecryptDmaMask),
+    .io_mem_din           (sailorMoonDecryptDmaDin),
+    .io_mem_dout          (decryptDmaDout),
+    .io_mem_wait_n        (decryptDmaWaitN),
+    .io_mem_valid         (decryptDmaValid),
+    .io_mem_burstLength   (sailorMoonDecryptDmaBurstLength),
+    .io_mem_burstDone     (decryptDmaBurstDone)
+  );
+
+  assign decryptDmaBusy =
+    gameIsSailorMoon ? sailorMoonDecryptDmaBusy : mazingerDecryptDmaBusy;
+  assign decryptDmaRd =
+    gameIsSailorMoon ? sailorMoonDecryptDmaRd : mazingerDecryptDmaRd;
+  assign decryptDmaWr =
+    gameIsSailorMoon ? sailorMoonDecryptDmaWr : mazingerDecryptDmaWr;
+  assign decryptDmaAddr =
+    gameIsSailorMoon ? sailorMoonDecryptDmaAddr : mazingerDecryptDmaAddr;
+  assign decryptDmaMask =
+    gameIsSailorMoon ? sailorMoonDecryptDmaMask : mazingerDecryptDmaMask;
+  assign decryptDmaDin =
+    gameIsSailorMoon ? sailorMoonDecryptDmaDin : mazingerDecryptDmaDin;
+  assign decryptDmaBurstLength =
+    gameIsSailorMoon ? sailorMoonDecryptDmaBurstLength : mazingerDecryptDmaBurstLength;
+
   CaveReadCache #(
-    .IN_ADDR_WIDTH  (20),
+    .IN_ADDR_WIDTH  (22),
     .IN_DATA_WIDTH  (16),
     .OUT_ADDR_WIDTH (25),
     .INDEX_WIDTH    (7),
-    .TAG_WIDTH      (11)
+    .TAG_WIDTH      (13)
   ) progRomCache (
     .clock         (clock),
     .reset         (reset),

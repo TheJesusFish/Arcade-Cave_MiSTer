@@ -163,6 +163,7 @@ module Cave(
   wire [15:0]  _main_io_soundCtrl_oki_1_dout;
   wire [15:0]  _main_io_soundCtrl_ymz_dout;
   wire [15:0]  _main_io_soundCtrl_reply;
+  wire         _main_io_soundCtrl_reply_empty;
   wire         _main_io_soundCtrl_irq;
   wire [15:0]  _main_io_progRom_dout;
   wire         _main_io_progRom_valid;
@@ -224,7 +225,7 @@ module Cave(
   wire [15:0]  _main_io_soundCtrl_data;
   wire         _main_io_soundCtrl_reply_rd;
   wire         _main_io_progRom_rd;
-  wire [19:0]  _main_io_progRom_addr;
+  wire [21:0]  _main_io_progRom_addr;
   wire         _main_io_eeprom_rd;
   wire         _main_io_eeprom_wr;
   wire [6:0]   _main_io_eeprom_addr;
@@ -246,7 +247,7 @@ module Cave(
   wire         _memSys_io_prog_nvram_wr;
   wire         _memSys_io_prog_done;
   wire         _memSys_io_progRom_rd;
-  wire [19:0]  _memSys_io_progRom_addr;
+  wire [21:0]  _memSys_io_progRom_addr;
   wire         _memSys_io_eeprom_rd;
   wire         _memSys_io_eeprom_wr;
   wire [6:0]   _memSys_io_eeprom_addr;
@@ -338,7 +339,9 @@ module Cave(
   reg          videoVBlankPipe0;
   reg          videoVBlankPipe1;
   reg          videoVBlankPipe2;
-  reg          mazingerSpriteSwapPrimed;
+  reg          spriteFrameBufferSwapPrimed;
+  reg          airGalletSpriteStartPending;
+  reg          airGalletSpriteFrameInFlight;
   reg  [3:0]   gameIndexReg;
   reg          gameIndexReg_latched;
   reg          ioctlDownloadReg;
@@ -364,6 +367,7 @@ module Cave(
   wire         gameIsMazinger;
   wire         gameIsAirGallet;
   wire         gameIsSailorMoon;
+  wire         _main_io_sailorMoonTilebank;
 
   CaveGameConfig gameConfig (
     .game_index           (gameIndexReg),
@@ -429,23 +433,52 @@ module Cave(
   wire         optionGameIndexFallback =
     ~ioctl_download & ioctlDownloadReg & ~gameIndexReg_latched;
   wire         effectiveRotate = options_rotate;
+  wire         videoVBlankRising = videoVBlankPipe1 & ~videoVBlankPipe2;
   wire         videoVBlankFalling = ~videoVBlankPipe1 & videoVBlankPipe2;
-  wire         spriteStartAllowed = ~gameIsMazinger | mazingerSpriteSwapPrimed;
-  wire         mazingerSpriteSwapReady =
-    ~mazingerSpriteSwapPrimed | _gpu_io_spriteCtrl_frameReady;
+  // Air Gallet's sprite call is inverted: b80008 arms drawing, vblank swaps pages.
+  wire         airGalletInvertedSpriteCall = gameIsAirGallet;
+  wire         airGalletSpriteFrameReady =
+    airGalletSpriteFrameInFlight & _gpu_io_spriteCtrl_frameReady;
+  wire         airGalletSpriteStart =
+    videoVBlankFalling & airGalletSpriteStartPending & ~airGalletSpriteFrameInFlight;
+  wire         spriteSwapNeedsFrameReady = gameIsMazinger;
+  wire         spriteStartAllowed = ~gameIsMazinger | spriteFrameBufferSwapPrimed;
+  wire         spriteFrameBufferSwapReady =
+    ~spriteFrameBufferSwapPrimed | _gpu_io_spriteCtrl_frameReady;
+  wire         spriteFrameBufferSwapRequest =
+    airGalletInvertedSpriteCall
+      ? (videoVBlankRising & airGalletSpriteFrameReady)
+      : _main_io_spriteFrameBufferSwap;
   wire         spriteFrameBufferSwap =
-    _main_io_spriteFrameBufferSwap &
-    (~gameIsMazinger | mazingerSpriteSwapReady);
+    spriteFrameBufferSwapRequest &
+    (~spriteSwapNeedsFrameReady | spriteFrameBufferSwapReady);
+  wire         spriteProcessorStart =
+    airGalletInvertedSpriteCall ? airGalletSpriteStart :
+    videoVBlankFalling & spriteStartAllowed;
   always @(posedge clock) begin
     videoVBlankPipe0 <= _videoSys_io_video_vBlank;
     videoVBlankPipe1 <= videoVBlankPipe0;
     videoVBlankPipe2 <= videoVBlankPipe1;
     if (reset | ~_memSys_io_ready | ~gameIsMazinger) begin
-      mazingerSpriteSwapPrimed <= 1'b0;
+      spriteFrameBufferSwapPrimed <= 1'b0;
     end
     else begin
       if (spriteFrameBufferSwap)
-        mazingerSpriteSwapPrimed <= 1'b1;
+        spriteFrameBufferSwapPrimed <= 1'b1;
+    end
+    if (reset | ~_memSys_io_ready | ~airGalletInvertedSpriteCall) begin
+      airGalletSpriteStartPending <= 1'b0;
+      airGalletSpriteFrameInFlight <= 1'b0;
+    end
+    else begin
+      if (_main_io_spriteFrameBufferSwap)
+        airGalletSpriteStartPending <= 1'b1;
+      if (airGalletSpriteStart) begin
+        airGalletSpriteStartPending <= 1'b0;
+        airGalletSpriteFrameInFlight <= 1'b1;
+      end
+      if (spriteFrameBufferSwap)
+        airGalletSpriteFrameInFlight <= 1'b0;
     end
     if (optionGameIndexFallback)
       gameIndexReg <= options_gameIndex;
@@ -762,6 +795,7 @@ module Cave(
     .io_soundCtrl_data                      (_main_io_soundCtrl_data),
     .io_soundCtrl_reply_rd                  (_main_io_soundCtrl_reply_rd),
     .io_soundCtrl_reply                     (_main_io_soundCtrl_reply),
+    .io_soundCtrl_reply_empty               (_main_io_soundCtrl_reply_empty),
     .io_soundCtrl_irq                       (_main_io_soundCtrl_irq),
     .io_progRom_rd                          (_main_io_progRom_rd),
     .io_progRom_addr                        (_main_io_progRom_addr),
@@ -774,6 +808,7 @@ module Cave(
     .io_eeprom_dout                         (_main_io_eeprom_dout),
     .io_eeprom_wait_n                       (_main_io_eeprom_wait_n),
     .io_eeprom_valid                        (_main_io_eeprom_valid),
+    .io_sailorMoonTilebank                  (_main_io_sailorMoonTilebank),
     .io_spriteFrameBufferSwap               (_main_io_spriteFrameBufferSwap)
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
     ,
@@ -839,6 +874,7 @@ module Cave(
     .io_ctrl_data                 (_main_io_soundCtrl_data),
     .io_ctrl_reply_rd             (_main_io_soundCtrl_reply_rd),
     .io_ctrl_reply                (_main_io_soundCtrl_reply),
+    .io_ctrl_reply_empty          (_main_io_soundCtrl_reply_empty),
     .io_ctrl_irq                  (_main_io_soundCtrl_irq),
     .io_gameIndex                 (gameIndexReg),
     .io_gameConfig_sound_0_device (gameConfig_sound_0_device),
@@ -905,7 +941,7 @@ module Cave(
     .io_out_wait_n  (_memSys_io_soundRom_2_wait_n),
     .io_out_valid   (_memSys_io_soundRom_2_valid)
   );
-  assign _gpu_io_spriteCtrl_start = videoVBlankFalling & spriteStartAllowed;
+  assign _gpu_io_spriteCtrl_start = spriteProcessorStart;
   assign _gpu_io_spriteCtrl_zoom = gameConfig_sprite_zoom;
   assign _gpu_io_gameConfig_layer_1_paletteBank = gameConfig_layer_1_paletteBank;
   GPU gpu (
@@ -994,6 +1030,7 @@ module Cave(
     .io_gameConfig_layer_2_paletteBank   (gameConfig_layer_2_paletteBank),
     .io_gameConfig_maskLeftColumn        (gameIsAirGallet),
     .io_gameConfig_airLayer2Direct6bpp   (gameIsAirGallet | gameIsSailorMoon),
+    .io_gameConfig_sailorMoonTilebank    (_main_io_sailorMoonTilebank),
     .io_options_rotate                   (effectiveRotate),
     .io_options_rotateClockwise          (rotateClockwise),
     .io_options_flipVideo                (options_flipVideo),

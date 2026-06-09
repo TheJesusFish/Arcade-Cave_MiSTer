@@ -30,6 +30,10 @@ module AirGalletMainDecoder(
   output        layer0_regs_select,
   output        layer1_regs_select,
   output        layer2_regs_select,
+  output        layer0_regs_data_select,
+  output        layer1_regs_data_select,
+  output        layer2_regs_data_select,
+  output        layer_regs_mirror_select,
   output        sprite_regs_select,
   output        irq_select,
   output        irq_read,
@@ -119,12 +123,33 @@ module AirGalletMainDecoder(
     (cpu_byte_addr >= 24'h880000) & (cpu_byte_addr < 24'h888000);
   assign layer2_vram8_select =
     (cpu_byte_addr >= 24'h900000) & (cpu_byte_addr < 24'h908000);
-  assign layer0_regs_select =
+  wire layer0_regs_ack_select =
+    (cpu_byte_addr >= 24'ha00000) & (cpu_byte_addr < 24'ha00100);
+  wire layer1_regs_ack_select =
+    (cpu_byte_addr >= 24'ha80000) & (cpu_byte_addr < 24'ha80100);
+  wire layer2_regs_ack_select =
+    (cpu_byte_addr >= 24'hb00000) & (cpu_byte_addr < 24'hb00100);
+  wire layer0_regs_write_select =
     (cpu_byte_addr >= 24'ha00000) & (cpu_byte_addr < 24'ha00006);
-  assign layer1_regs_select =
+  wire layer1_regs_write_select =
     (cpu_byte_addr >= 24'ha80000) & (cpu_byte_addr < 24'ha80006);
-  assign layer2_regs_select =
+  wire layer2_regs_write_select =
     (cpu_byte_addr >= 24'hb00000) & (cpu_byte_addr < 24'hb00006);
+  assign layer0_regs_select =
+    layer0_regs_ack_select;
+  assign layer1_regs_select =
+    layer1_regs_ack_select;
+  assign layer2_regs_select =
+    layer2_regs_ack_select;
+  assign layer0_regs_data_select =
+    layer0_regs_write_select;
+  assign layer1_regs_data_select =
+    layer1_regs_write_select;
+  assign layer2_regs_data_select =
+    layer2_regs_write_select;
+  assign layer_regs_mirror_select =
+    (layer0_regs_ack_select | layer1_regs_ack_select | layer2_regs_ack_select) &
+    ~(layer0_regs_data_select | layer1_regs_data_select | layer2_regs_data_select);
   assign sprite_regs_select =
     (cpu_byte_addr >= 24'hb80000) & (cpu_byte_addr < 24'hb80080);
   assign irq_select =
@@ -146,10 +171,12 @@ module AirGalletMainDecoder(
 
   assign prog_rom_access = prog_rom_select | (extra_rom_has_data & extra_rom_select);
   assign prog_rom_ready = prog_rom_access & cpu_rw & prog_rom_valid;
+  wire rom_write_ack = (prog_rom_select | extra_rom_select) & ~cpu_rw;
   assign sync_dtack =
+    rom_write_ack |
     main_ram_select | work_ram_select | palette_select | sprite_ram_select |
     layer0_vram8_select | layer1_vram8_select | layer2_vram8_select |
-    layer0_regs_select | layer1_regs_select | layer2_regs_select |
+    layer0_regs_ack_select | layer1_regs_ack_select | layer2_regs_ack_select |
     sprite_regs_select | (extra_rom_select & ~extra_rom_has_data) | input0_read | input1_read |
     eeprom_write;
   assign cycle = game_active & cpu_as;
@@ -157,8 +184,8 @@ module AirGalletMainDecoder(
     prog_rom_access | extra_rom_select | main_ram_select | work_ram_select |
     palette_select | sprite_ram_select | input0_select | input1_select |
     eeprom_select | layer0_vram8_select | layer1_vram8_select |
-    layer2_vram8_select | layer0_regs_select | layer1_regs_select |
-    layer2_regs_select | sprite_regs_select | sound_select;
+    layer2_vram8_select | layer0_regs_ack_select | layer1_regs_ack_select |
+    layer2_regs_ack_select | sprite_regs_select | sound_select;
   assign unmapped_cycle = cycle & ~known_select;
 
   assign prog_rom_read =
@@ -177,9 +204,9 @@ module AirGalletMainDecoder(
   assign layer0_vram8_write = layer0_vram8_select & write_strobe;
   assign layer1_vram8_write = layer1_vram8_select & write_strobe;
   assign layer2_vram8_write = layer2_vram8_select & write_strobe;
-  assign layer0_regs_write = layer0_regs_select & write_strobe;
-  assign layer1_regs_write = layer1_regs_select & write_strobe;
-  assign layer2_regs_write = layer2_regs_select & write_strobe;
+  assign layer0_regs_write = layer0_regs_write_select & write_strobe;
+  assign layer1_regs_write = layer1_regs_write_select & write_strobe;
+  assign layer2_regs_write = layer2_regs_write_select & write_strobe;
   assign sprite_regs_write = sprite_regs_select & write_strobe;
 
   assign cpu_space = &cpu_fc;

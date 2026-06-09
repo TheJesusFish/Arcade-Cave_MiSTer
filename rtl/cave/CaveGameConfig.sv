@@ -257,8 +257,8 @@ module CaveGameConfig (
         eeprom_offset       = 32'h0028_0000;
         sound_0_device      = SOUND_DEVICE_Z80;
         sound_0_rom_offset  = 32'h0028_0080;
-        sound_1_rom_offset  = 32'h01a0_0080;
-        sound_2_rom_offset  = 32'h01c0_0080;
+        sound_1_rom_offset  = 32'h01d0_0080;
+        sound_2_rom_offset  = 32'h01f0_0080;
         layer_0_format      = GFX_FORMAT_4BPP;
         layer_0_rom_offset  = 32'h0070_0080;
         layer_0_palette_bank = 2'h1;

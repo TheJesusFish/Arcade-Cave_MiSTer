@@ -23,6 +23,7 @@ module Sound(
   input  [15:0] io_ctrl_data,
   input         io_ctrl_reply_rd,
   output [15:0] io_ctrl_reply,
+  output        io_ctrl_reply_empty,
   output        io_ctrl_irq,
   input  [3:0]  io_gameIndex,
   input  [1:0]  io_gameConfig_sound_0_device,
@@ -251,6 +252,9 @@ module Sound(
   wire [24:0] defaultOki0MappedAddr = {4'h0, oki0Bank, oki0RomAddr[16:0]};
   wire [24:0] airOki0MappedAddr = defaultOki0MappedAddr;
   wire [24:0] airOki1MappedAddr = {4'h0, oki1Bank, oki1RomAddr[16:0]};
+  wire [24:0] sailorMoonOki1MappedAddr = {6'h00, oki1Bank[1:0], oki1RomAddr[16:0]};
+  wire [24:0] airFamilyOki1MappedAddr =
+    sailormoonZ80 ? sailorMoonOki1MappedAddr : airOki1MappedAddr;
   wire [24:0] oki0MappedAddr = donpachi ? nmkOki0AddrOut : defaultOki0MappedAddr;
   wire [24:0] oki1MappedAddr = donpachi ? nmkOki1AddrOut : {4'h0, oki1Bank, oki1RomAddr[16:0]};
   wire [7:0]  oki0RomData = airFamilyZ80Sound ? io_rom_1_dout : oki0RomDout;
@@ -493,6 +497,7 @@ module Sound(
     .io_cpu_dout     (oki0CpuDout),
     .io_rom_rd       (oki0RomRead),
     .io_rom_addr     (oki0RomAddr),
+    .io_rom_cache_addr (airFamilyZ80Sound ? airOki0MappedAddr : oki0MappedAddr),
     .io_rom_dout     (oki0RomData),
     .io_rom_valid    (oki0RomDataValid),
     .io_audio_valid  (oki0AudioValid),
@@ -512,6 +517,7 @@ module Sound(
     .io_cpu_dout     (oki1CpuDout),
     .io_rom_rd       (oki1RomRead),
     .io_rom_addr     (oki1RomAddr),
+    .io_rom_cache_addr (airFamilyZ80Sound ? airFamilyOki1MappedAddr : oki1MappedAddr),
     .io_rom_dout     (oki1RomData),
     .io_rom_valid    (oki1RomDataValid),
     .io_audio_valid  (oki1AudioValid),
@@ -594,6 +600,7 @@ module Sound(
   AudioMixer io_audio_mixer (
     .clock   (clock),
     .io_airgallet (airFamilyZ80Sound),
+    .io_sailormoon (sailormoonZ80),
     .io_mazinger (mazingerZ80),
     .io_in_4 (oki1AudioReg),
     .io_in_3 (oki0AudioReg),
@@ -609,6 +616,7 @@ module Sound(
   assign io_ctrl_oki_1_dout = {8'h00, oki1CpuDout};
   assign io_ctrl_ymz_dout = {8'h00, ymzCpuDout};
   assign io_ctrl_reply = (replyCount == 6'd0) ? 16'h00ff : {8'h00, replyFifo[replyReadPtr]};
+  assign io_ctrl_reply_empty = replyCount == 6'd0;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   wire [7:0] debugH0 = mazingerZ80 ? oki1CpuDout : debugLastYmAddr;
   wire [7:0] debugH1 = mazingerZ80 ? oki1AudioReg[13:6] : debugLastYmData;
@@ -637,5 +645,5 @@ module Sound(
     airFamilyZ80Sound ? airOki0MappedAddr :
                    oki1MappedAddr;
   assign io_rom_2_rd = airFamilyZ80Sound & oki1RomRead;
-  assign io_rom_2_addr = airOki1MappedAddr;
+  assign io_rom_2_addr = airFamilyOki1MappedAddr;
 endmodule

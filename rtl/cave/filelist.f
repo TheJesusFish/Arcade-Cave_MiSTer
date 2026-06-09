@@ -28,6 +28,7 @@ DDR.sv
 SDRAM.sv
 CaveBurstDMAs.sv
 MazingerSpriteDecryptDMA.sv
+SailorMoonSpriteDecryptDMA.sv
 CaveReadCache.sv
 CaveNvramWriteBackCache.sv
 CaveAsyncMemArbiters.sv
