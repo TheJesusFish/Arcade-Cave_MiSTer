@@ -1,6 +1,6 @@
 <misterromdescription>
   <name>DonPachi (US)</name>
-  <mameversion>0226</mameversion>
+  <mameversion>0288</mameversion>
   <setname>donpachi</setname>
   <year>1995</year>
   <manufacturer>CAVE</manufacturer>
@@ -50,5 +50,5 @@
   <!-- NVRAM -->
   <nvram index="2" size="128" />
 
-  <buttons names="Shots/Laser,Spread/Laser Bomber,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
+  <buttons names="Shot/Laser,Bomb,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
 </misterromdescription>

@@ -1,7 +1,7 @@
 <misterromdescription>
-  <name>ESP Ra.De. (World, 1998 4/22 International Ver.).</name>
-  <mameversion>0226</mameversion>
-  <setname>esprade</setname>
+  <name>ESP Ra.De. (Japan, 1998 4/14 Master Ver.)</name>
+  <mameversion>0288</mameversion>
+  <setname>espradejo</setname>
   <year>1998</year>
   <manufacturer>CAVE</manufacturer>
   <category>Shooter</category>
@@ -9,11 +9,11 @@
   <rbf>cave</rbf>
 
   <!-- ROM data -->
-  <rom index="0" zip="esprade.zip" md5="none" address="0x30000000">
+  <rom index="0" zip="espradejo.zip|esprade.zip" md5="none" address="0x30000000">
     <!-- prog ROM -->
     <interleave output="16">
-      <part name="u42.int" crc="3b510a73" map="01" />
-      <part name="u41.int" crc="97c1b649" map="10" />
+      <part name="u42_ver.2" crc="75d03c42" map="01" />
+      <part name="u41_ver.2" crc="734b3ef0" map="10" />
     </interleave>
 
     <!-- EEPROM -->

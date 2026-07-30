@@ -1,6 +1,6 @@
 <misterromdescription>
   <name>Fever SOS (World, 98/09/25 VER)</name>
-  <mameversion>0226</mameversion>
+  <mameversion>0288</mameversion>
   <setname>feversos</setname>
   <year>1998</year>
   <manufacturer>CAVE</manufacturer>
@@ -45,5 +45,5 @@
   <!-- NVRAM -->
   <nvram index="2" size="128" />
 
-  <buttons names="Normal/Powerful Shot,Bomber,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
+  <buttons names="Shot/Power Shot,Bomb,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
 </misterromdescription>

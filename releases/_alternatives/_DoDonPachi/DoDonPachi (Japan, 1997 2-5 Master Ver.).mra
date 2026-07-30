@@ -1,7 +1,7 @@
 <misterromdescription>
-  <name>DoDonPachi (World, 1997 2/5 Master Ver.)</name>
-  <mameversion>0226</mameversion>
-  <setname>ddonpach</setname>
+  <name>DoDonPachi (Japan, 1997 2/ 5 Master Ver.)</name>
+  <mameversion>0288</mameversion>
+  <setname>ddonpachj</setname>
   <year>1997</year>
   <manufacturer>CAVE</manufacturer>
   <category>Shooter</category>
@@ -9,11 +9,11 @@
   <rbf>cave</rbf>
 
   <!-- ROM data -->
-  <rom index="0" zip="ddonpach.zip" md5="none" address="0x30000000">
+  <rom index="0" zip="ddonpach.zip|ddonpachj.zip" md5="none" address="0x30000000">
     <!-- prog ROM -->
     <interleave output="16">
-      <part name="b1.u27" crc="b5cdc8d3" map="01" />
-      <part name="b2.u26" crc="6bbb063a" map="10" />
+      <part name="u27.bin" crc="2432ff9b" map="01" />
+      <part name="u26.bin" crc="4f3a914a" map="10" />
     </interleave>
 
     <!-- EEPROM -->
@@ -39,9 +39,9 @@
     <part name="u53.bin" crc="cb4c10f0" />
 
     <!-- skip CRC -->
-    <patch offset="0x00005404">60 00 00 0C</patch>
+    <patch offset="0x00005410">60 00 00 0C</patch>
     <!-- skip warning -->
-    <patch offset="0x000054E0">60 00 00 50</patch>
+    <patch offset="0x000054EC">60 00 00 50</patch>
 
     <!-- enable C button in EEPROM -->
     <patch offset="0x00100002">ff ff</patch>
@@ -56,5 +56,5 @@
   <!-- NVRAM -->
   <nvram index="2" size="128" />
 
-  <buttons names="Shots/Laser,Spread/Laser Bomber,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
+  <buttons names="Shot/Laser,Bomb,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
 </misterromdescription>

@@ -205,6 +205,8 @@ module CaveOKIM6295Core #(
   reg         ctrl_debug_capture_done_d;
   wire        ctrl_debug_done_rise = ctrl_debug_capture_done & ~ctrl_debug_capture_done_d;
   wire [47:0] rom_debug_table_bytes;
+  reg  [3:0]  start_seen;
+  reg  [3:0]  start_busy_latched;
 
   localparam [21:0] DUP_BUSY_WINDOW_RELOAD = 22'h3fffff;
 
@@ -287,7 +289,10 @@ module CaveOKIM6295Core #(
   wire [3:0]  handled_busy_start = ignored_busy_start | restart_new;
   wire [3:0]  accepted_direct_start = ack & direct_start;
 
-  assign busy_start = start & busy;
+  wire [3:0] new_start_request = start & ~start_seen;
+  assign busy_start =
+    (new_start_request & busy) |
+    (start & start_seen & start_busy_latched);
   assign direct_start = start & ~handled_busy_start;
   assign serial_start = direct_start | restart_start;
   assign serial_stop = stop | restart_stop;
@@ -297,6 +302,23 @@ module CaveOKIM6295Core #(
   assign ctrl_ack = ack | handled_busy_start;
   assign dout = {4'hf, busy | (status_includes_start ? serial_start : 4'd0)};
   assign debug_busy_state = {restart_pending, restart_start};
+
+  // Classify a request against the pre-existing voice state once. The serial
+  // engine can assert busy before it acknowledges a free start; re-evaluating
+  // busy throughout that handshake would make an ignore policy eat its own
+  // newly accepted request.
+  always @(posedge clk) begin
+    if (rst) begin
+      start_seen <= 4'd0;
+      start_busy_latched <= 4'd0;
+    end
+    else begin
+      start_seen <= (start_seen | start) & start;
+      start_busy_latched <=
+        (start_busy_latched & start_seen & start) |
+        (busy & new_start_request);
+    end
+  end
 
   always @(posedge clk) begin
     if (rst) begin

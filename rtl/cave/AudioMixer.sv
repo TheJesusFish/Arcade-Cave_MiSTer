@@ -53,7 +53,7 @@ module AudioMixer (
     + $signed({{6{io_in_4[13]}}, io_in_4, 6'b000000});
   wire signed [28:0] legacy_mix_ext = {{3{legacy_mix_sum[25]}}, legacy_mix_sum};
 
-  wire signed [18:0] pwrinst2_psg_sample = $signed({3'b000, io_in_1}) - 19'sd16384;
+  wire signed [18:0] pwrinst2_psg_sample = $signed({3'b000, io_in_1});
   wire signed [18:0] pwrinst2_fm_sample = $signed({{3{io_in_2[15]}}, io_in_2});
   wire signed [18:0] pwrinst2_oki0_sample = $signed({{3{io_in_3[13]}}, io_in_3, 2'b00});
   wire signed [18:0] pwrinst2_oki1_sample = $signed({{3{io_in_4[13]}}, io_in_4, 2'b00});
@@ -65,11 +65,20 @@ module AudioMixer (
     $signed({{13{pwrinst2_psg_sample[18]}}, pwrinst2_psg_sample});
   wire signed [31:0] pwrinst2_fm_base =
     $signed({{13{pwrinst2_fm_sample[18]}}, pwrinst2_fm_sample});
-  wire signed [31:0] pwrinst2_psg_anchor = pwrinst2_psg_base <<< 1;
-  wire signed [31:0] pwrinst2_fm_anchor = pwrinst2_fm_base <<< 4;
-  wire signed [31:0] pwrinst2_oki0_anchor = pwrinst2_oki0_base <<< 3;
-  wire signed [31:0] pwrinst2_oki1_anchor =
-    (pwrinst2_oki1_base <<< 2) + (pwrinst2_oki1_base <<< 1);
+  // MAME routes each YM2203 output and OKI0 at 0.8, and OKI1 at 1.0.
+  // JT49's combined PSG output is half the normalized amplitude of MAME's
+  // three separate PSG streams, so it uses the same 0.8 aggregate gain.
+  // Headroom divides these anchors by four; 51/64 approximates 0.8.
+  wire signed [31:0] pwrinst2_psg_anchor =
+    (pwrinst2_psg_base <<< 1) + pwrinst2_psg_base +
+    (pwrinst2_psg_base >>> 3) + (pwrinst2_psg_base >>> 4);
+  wire signed [31:0] pwrinst2_fm_anchor =
+    (pwrinst2_fm_base <<< 1) + pwrinst2_fm_base +
+    (pwrinst2_fm_base >>> 3) + (pwrinst2_fm_base >>> 4);
+  wire signed [31:0] pwrinst2_oki0_anchor =
+    (pwrinst2_oki0_base <<< 1) + pwrinst2_oki0_base +
+    (pwrinst2_oki0_base >>> 3) + (pwrinst2_oki0_base >>> 4);
+  wire signed [31:0] pwrinst2_oki1_anchor = pwrinst2_oki1_base <<< 2;
   wire signed [31:0] pwrinst2_psg_gain = pwrinst2_apply_trim(pwrinst2_psg_anchor, io_pwrinst2_psg_level);
   wire signed [31:0] pwrinst2_fm_gain = pwrinst2_apply_trim(pwrinst2_fm_anchor, io_pwrinst2_fm_level);
   wire signed [31:0] pwrinst2_oki0_gain = pwrinst2_apply_trim(pwrinst2_oki0_anchor, io_pwrinst2_oki0_level);

@@ -55,7 +55,7 @@ assign VIDEO_ARY = (!aspect_ratio) ? (orientation ? 12'd4 : 12'd3) : 12'd0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-  "Cave;;",
+  "Cave;SS3E000000:400000;",
   "D0O12,Aspect ratio,Original,Fullscreen,[ARC1],[ARC2];",
   "D0O4,Flip screen,Off,On;",
   "D1O3,Rotate screen,Off,On;",
@@ -86,14 +86,30 @@ localparam CONF_STR = {
   "P1O[32],PI2 Headroom,On,Off;",
   "P1O[35:33],PI2 PSG Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
   "P1O[38:36],PI2 FM Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
-  "P1-;",
-`else
-  "P1,Hardware;",
-`endif
   "P1OIL,PCB,Dangun Feveron,DoDonPachi,DonPachi,ESP Ra.De.,Puzzle Uo Poko,Guwange,Gaia,Power Instinct 2,Gogetsuji Legends;",
+  "P1-;",
+`endif
+  "O[42:41],Savestate Slot,1,2,3,4;",
+  "O[43],Autoincrement Slot,Off,On;",
+  "R[44],Save state (Alt-F1);",
+  "R[45],Restore state (F1);",
   "-;",
   "R0,Reset;",
   "J,B0,B1,B2,B3,Start,Coin,Pause;",
+  "I,",
+  "Load=DPAD Up|Save=Down|Slot=L+R,",
+  "Active Slot 1,",
+  "Active Slot 2,",
+  "Active Slot 3,",
+  "Active Slot 4,",
+  "Save to state 1,",
+  "Restore state 1,",
+  "Save to state 2,",
+  "Restore state 2,",
+  "Save to state 3,",
+  "Restore state 3,",
+  "Save to state 4,",
+  "Restore state 4;",
   "V,v",`BUILD_DATE," by nullobject;"
 };
 
@@ -214,12 +230,29 @@ wire [15:0] ioctl_dout;
 wire [10:0] ps2_key;
 wire [31:0] joystick_0, joystick_1;
 
+wire        ss_save_request;
+wire        ss_load_request;
+wire        ss_available;
+wire        ss_active;
+wire        ss_busy;
+wire [3:0]  ss_state_debug;
+wire [3:0]  ss_last_error;
+wire        ss_info_request;
+wire [7:0]  ss_info;
+wire        ss_status_update;
+wire [1:0]  ss_slot;
+wire [31:0] cave_service_debug;
+wire [31:0] ss_joystick = joystick_0 | joystick_1;
+wire [127:0] status_in = {status[127:43], ss_slot, status[40:0]};
+
 hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
   .clk_sys(clk_sys),
   .HPS_BUS(HPS_BUS),
 
   .buttons(buttons),
   .status(status),
+  .status_in(status_in),
+  .status_set(ss_status_update),
   .status_menumask({15'd0, direct_video}),
   .forced_scandoubler(forced_scandoubler),
   .new_vmode(new_vmode),
@@ -240,8 +273,97 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
   .joystick_0(joystick_0),
   .joystick_1(joystick_1),
 
-  .ps2_key(ps2_key)
+  .ps2_key(ps2_key),
+
+  .info_req(ss_info_request),
+  .info(ss_info)
 );
+
+CaveSaveStateUi saveStateUi (
+  .clk            (clk_sys),
+  .ps2_key        (ps2_key),
+  .allow_ss       (ss_available & ~ss_active & ~rst_sys),
+  .joy_ss         (ss_joystick[13]),
+  .joy_right      (ss_joystick[0]),
+  .joy_left       (ss_joystick[1]),
+  .joy_down       (ss_joystick[2]),
+  .joy_up         (ss_joystick[3]),
+  .status_slot    (status[42:41]),
+  .autoinc_slot   (status[43]),
+  .osd_saveload   (status[45:44]),
+  .save_request   (ss_save_request),
+  .load_request   (ss_load_request),
+  .info_request   (ss_info_request),
+  .info           (ss_info),
+  .status_update  (ss_status_update),
+  .selected_slot  (ss_slot)
+);
+
+`ifdef CAVE_ESPRADE_SERVICE_DIAGNOSTICS
+reg        esprade_service_status_prev = 1'b0;
+reg        esprade_service_update_prev = 1'b0;
+reg [7:0]  esprade_service_status_rises = 8'd0;
+reg [7:0]  esprade_service_update_rises = 8'd0;
+reg [15:0] esprade_service_update_status = 16'd0;
+
+always @(posedge clk_sys) begin
+  if (rst_sys) begin
+    esprade_service_status_prev <= 1'b0;
+    esprade_service_update_prev <= 1'b0;
+    esprade_service_status_rises <= 8'd0;
+    esprade_service_update_rises <= 8'd0;
+    esprade_service_update_status <= 16'd0;
+  end
+  else begin
+    esprade_service_status_prev <= status[9];
+    esprade_service_update_prev <= ss_status_update;
+
+    if (status[9] && !esprade_service_status_prev)
+      esprade_service_status_rises <= esprade_service_status_rises + 8'd1;
+
+    if (ss_status_update && !esprade_service_update_prev) begin
+      esprade_service_update_rises <= esprade_service_update_rises + 8'd1;
+      esprade_service_update_status <= status[15:0];
+    end
+  end
+end
+
+wire [127:0] esprade_service_probe = {
+  16'hE59D,
+  4'd1,
+  status[21:18],
+  {
+    rst_sys,
+    ioctl_download,
+    ss_available,
+    ss_active,
+    ss_status_update,
+    status[9],
+    status_in[9],
+    ss_busy
+  },
+  status[15:0],
+  status_in[15:0],
+  esprade_service_update_status,
+  cave_service_debug,
+  esprade_service_update_rises,
+  esprade_service_status_rises
+};
+wire [0:0] esprade_service_source;
+
+altsource_probe #(
+  .sld_auto_instance_index ("NO"),
+  .sld_instance_index      (3),
+  .instance_id             ("ESD"),
+  .probe_width             (128),
+  .source_width            (1),
+  .source_initial_value    ("0"),
+  .enable_metastability    ("NO")
+) espradeServiceDiagnosticsProbe (
+  .probe  (esprade_service_probe),
+  .source (esprade_service_source)
+);
+`endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // VIDEO
@@ -299,7 +421,7 @@ wire scandoubler = fx || forced_scandoubler;
 assign VGA_F1 = 0;
 assign VGA_SL = sl[1:0];
 assign VGA_SCALER = 0;
-assign HDMI_FREEZE = 0;
+assign HDMI_FREEZE = ss_active;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = 0;
 
@@ -484,6 +606,16 @@ Cave cave (
   .player_1_start(player_2_start),
   .player_1_coin(player_2_coin),
   .player_1_pause(player_2_pause),
+  // Save states
+  .ss_save_request(ss_save_request),
+  .ss_load_request(ss_load_request),
+  .ss_slot(ss_slot),
+  .ss_available(ss_available),
+  .ss_active(ss_active),
+  .ss_busy(ss_busy),
+  .ss_state_debug(ss_state_debug),
+  .ss_last_error(ss_last_error),
+  .service_debug(cave_service_debug),
   // Video signals
   .video_clockEnable(ce_pix),
   .video_changeMode(core_video_change_mode),
@@ -512,6 +644,7 @@ Cave cave (
   .ddr_wait_n(~DDRAM_BUSY),
   .ddr_valid(DDRAM_DOUT_READY),
   .ddr_burstLength(DDRAM_BURSTCNT),
+  .ddr_burstDone(1'b0),
   // SDRAM
   .sdram_cke(SDRAM_CKE),
   .sdram_cs_n(SDRAM_nCS),
