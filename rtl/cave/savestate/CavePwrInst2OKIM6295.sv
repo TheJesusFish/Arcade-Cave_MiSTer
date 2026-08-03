@@ -1,7 +1,8 @@
 module CavePwrInst2OKIM6295 #(
   parameter [7:0] SS_IDX = 8'd36,
   parameter FIR_COEFFS = "jt6295_up4_soft.hex",
-  parameter WRITE_HOLD_CYCLES = 8
+  parameter WRITE_HOLD_CYCLES = 8,
+  parameter FIXED_SAMPLE_CLOCK = 0
 ) (
   input         clock,
   input         reset,
@@ -58,7 +59,7 @@ wire chip_rom_ok =
 wire [7:0] chip_rom_data =
   io_wait_for_rom ? rom_data : io_rom_dout;
 wire hold_for_rom =
-  io_wait_for_rom & cen_next[16] & ~chip_rom_ok;
+  !FIXED_SAMPLE_CLOCK & io_wait_for_rom & cen_next[16] & ~chip_rom_ok;
 wire stretch_cpu_wr =
   io_stretch_cpu_wr & (WRITE_HOLD_CYCLES > 1);
 wire chip_cpu_wr = stretch_cpu_wr

@@ -14,12 +14,14 @@ savestate/CavePwrInst2YM2203.sv
 savestate/CavePwrInst2JT6295.sv
 savestate/CavePwrInst2OKIM6295.sv
 CaveOKIM6295.sv
+CavePwrInst2OkiRomCache.sv
 CaveLayerProcessor.sv
 CaveMainSupport.sv
 CaveSinglePortRam.sv
 CaveSyncReadMem.sv
 CaveSyncQueue.sv
 CaveTrueDualPortRam.sv
+CaveVideoHScale.sv
 CaveVideoTiming.sv
 CaveRegisterFiles.sv
 CavePageFlippers.sv

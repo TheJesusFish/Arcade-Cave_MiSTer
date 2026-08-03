@@ -2292,6 +2292,8 @@ assign auto_ss_ack = auto_ss_local_ack | auto_ss_u_timing_ack | auto_ss_u_rom_ac
 
   wire [3:0]  ack;
 
+  wire [3:0]  ctrl_start;
+
   wire [3:0]  start;
 
   wire [3:0]  serial_start;
@@ -2355,6 +2357,8 @@ assign auto_ss_ack = auto_ss_local_ack | auto_ss_u_timing_ack | auto_ss_u_rom_ac
   wire [47:0] rom_debug_table_bytes;
   reg  [3:0]  start_seen;
   reg  [3:0]  start_busy_latched;
+
+  reg         ctrl_start_final_byte_seen;
 
 
   localparam [21:0] DUP_BUSY_WINDOW_RELOAD = 22'h3fffff;
@@ -2520,6 +2524,9 @@ assign auto_ss_ack = auto_ss_local_ack | auto_ss_u_timing_ack | auto_ss_u_rom_ac
 
 
   wire [3:0] new_start_request = start & ~start_seen;
+  assign start = align_ctrl_ok
+    ? (ctrl_start & {4{ctrl_start_final_byte_seen}})
+    : ctrl_start;
   assign busy_start =
     (new_start_request & busy) |
     (start & start_seen & start_busy_latched);
@@ -2540,6 +2547,29 @@ assign auto_ss_ack = auto_ss_local_ack | auto_ss_u_timing_ack | auto_ss_u_rom_ac
   assign dout = {4'hf, busy | (status_includes_start ? serial_start : 4'd0)};
 
   assign debug_busy_state = {restart_pending, restart_start};
+
+  // Delay the Cave-local start handshake until JT6295 has consumed the sixth
+  // control-table byte and the complete stop address is stable.
+  always @(posedge clk)
+  begin
+    begin
+      if (rst || !(|ctrl_start)) begin
+        ctrl_start_final_byte_seen <= 1'b0;
+      end
+      else if (!save_hold && ctrl_ok) begin
+        ctrl_start_final_byte_seen <= 1'b1;
+      end
+    end
+    if (auto_ss_wr && device_match) begin
+      case (auto_ss_state_idx)
+        20: begin
+          ctrl_start_final_byte_seen <= auto_ss_data_in[21];
+        end
+        default: begin
+        end
+      endcase
+    end
+  end
 
   // Classify a request against the pre-existing voice state once. The serial
   // engine can assert busy before it acknowledges a free start; re-evaluating
@@ -3038,7 +3068,7 @@ end
 
     .debug_capture_done (ctrl_debug_capture_done),
 
-    .start      (start),
+    .start      (ctrl_start),
 
     .stop       (stop),
 
@@ -3357,7 +3387,7 @@ always_comb begin
             auto_ss_local_ack = 1'b1;
         end
         20: begin
-            auto_ss_local_data_out[20:0] = {ctrl_debug_capture_done_d, restart_pending, restart_att_3, restart_att_2, restart_att_1, restart_att_0};
+            auto_ss_local_data_out[21:0] = {ctrl_start_final_byte_seen, ctrl_debug_capture_done_d, restart_pending, restart_att_3, restart_att_2, restart_att_1, restart_att_0};
             auto_ss_local_ack = 1'b1;
         end
         21: begin

@@ -88,7 +88,9 @@ module CaveReadCache #(
   wire                   hit = hit_a | hit_b;
   wire [DEPTH-1:0]       lru_shifted = lru_reg >> current_index;
   wire                   lru_way = lru_shifted[0];
-  wire                   selected_way = (state_check & hit) ? ~hit_a : (start ? lru_way : way_reg);
+  // This value is sampled only in STATE_CHECK. way_reg already holds the
+  // replacement choice captured when the request started in STATE_IDLE.
+  wire                   selected_way = (state_check & hit) ? ~hit_a : way_reg;
   wire                   selected_valid = selected_way ? way_b_valid : way_a_valid;
   wire                   selected_dirty = selected_way ? way_b_dirty : way_a_dirty;
   wire [TAG_WIDTH-1:0]   selected_tag = selected_way ? way_b_tag : way_a_tag;

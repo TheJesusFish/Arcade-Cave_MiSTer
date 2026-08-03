@@ -176,13 +176,9 @@ module GPU(
 
   wire [8:0] flippedVideoX = io_video_regs_size_x - io_video_pos_x - 9'h001;
   wire [8:0] flippedVideoY = io_video_regs_size_y - io_video_pos_y - 9'h001;
-  wire       plegendsLayer2PrimeCycle =
-    io_gameConfig_plegends &
-    ~io_video_displayEnable &
-    (io_video_pos_x == 9'h1ff) &
-    (io_video_pos_y < io_video_regs_size_y);
   wire [8:0] layerVideoPosX = io_spriteCtrl_pwrinst2 ? (io_video_pos_x + 9'h070) : io_video_pos_x;
-  wire [8:0] layer2VideoPosX = plegendsLayer2PrimeCycle ? 9'h070 : layerVideoPosX;
+  wire [8:0] layer2VideoPosX =
+    io_gameConfig_plegends ? (layerVideoPosX + 9'h001) : layerVideoPosX;
   wire [17:0] videoX = {9'h000, io_video_pos_x};
   wire [17:0] videoY = {9'h000, io_video_pos_y};
   wire [17:0] videoSizeX = {9'h000, io_video_regs_size_x};

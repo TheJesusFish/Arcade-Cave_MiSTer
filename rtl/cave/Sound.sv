@@ -313,6 +313,16 @@ module Sound(
   wire        pwrinst2Z80SsReconstructionReady;
   wire        pwrinst2Oki0SsIdle;
   wire        pwrinst2Oki1SsIdle;
+  wire        pwrinst2Oki0RomCacheIdle;
+  wire        pwrinst2Oki1RomCacheIdle;
+  wire        pwrinst2Oki0MemRead;
+  wire [24:0] pwrinst2Oki0MemAddr;
+  wire [7:0]  pwrinst2Oki0CacheDout;
+  wire        pwrinst2Oki0CacheValid;
+  wire        pwrinst2Oki1MemRead;
+  wire [24:0] pwrinst2Oki1MemAddr;
+  wire [7:0]  pwrinst2Oki1CacheDout;
+  wire        pwrinst2Oki1CacheValid;
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
   wire [7:0]  ym2203PsgMagnitude = ym2203PsgAudio[15:8];
   wire [7:0]  ym2203FmMagnitude = ym2203FmAudio[15] ? ~ym2203FmAudio[14:7] : ym2203FmAudio[14:7];
@@ -343,7 +353,9 @@ module Sound(
     pwrinst2Z80SsCpuIdle &
     ym2203SsIdle &
     pwrinst2Oki0SsIdle &
-    pwrinst2Oki1SsIdle;
+    pwrinst2Oki1SsIdle &
+    pwrinst2Oki0RomCacheIdle &
+    pwrinst2Oki1RomCacheIdle;
   wire        pwrinst2SoundStateEnable =
     io_ss_hold & pwrinst2Z80Sound & pwrinst2SoundDevicesIdle;
   wire        sharedSoundStateEnable =
@@ -413,10 +425,10 @@ module Sound(
   wire [24:0] oki1MappedAddr = (donpachi | pwrinst2Z80Sound) ? nmkOki1AddrOut : bankedOki1MappedAddr;
   wire        pwrinst2Oki0TableRead = pwrinst2Z80Sound & oki0RomRead & pwrinst2Oki0TableRegion;
   wire        pwrinst2Oki0BodyRead = pwrinst2Z80Sound & oki0RomRead & (oki0RomAddr[17:10] != 8'h00);
-  wire [7:0]  oki0RomData = pwrinst2Z80Sound ? io_rom_1_dout : oki0RomDout;
-  wire        oki0RomDataValid = pwrinst2Z80Sound ? io_rom_1_valid : oki0RomValid;
-  wire [7:0]  oki1RomData = pwrinst2Z80Sound ? io_rom_2_dout : io_rom_1_dout;
-  wire        oki1RomDataValid = pwrinst2Z80Sound ? io_rom_2_valid : io_rom_1_valid;
+  wire [7:0]  oki0RomData = pwrinst2Z80Sound ? pwrinst2Oki0CacheDout : oki0RomDout;
+  wire        oki0RomDataValid = pwrinst2Z80Sound ? pwrinst2Oki0CacheValid : oki0RomValid;
+  wire [7:0]  oki1RomData = pwrinst2Z80Sound ? pwrinst2Oki1CacheDout : io_rom_1_dout;
+  wire        oki1RomDataValid = pwrinst2Z80Sound ? pwrinst2Oki1CacheValid : io_rom_1_valid;
   wire [15:0] ym2203PsgMix = io_options_ym_psg ? ym2203PsgAudioReg : 16'h0000;
   wire [15:0] ym2203FmMix = io_options_ym_fm ? ym2203FmAudioReg : 16'h0000;
   wire [13:0] oki0Mix = io_options_oki_0 ? oki0AudioReg : 14'h0000;
@@ -1102,9 +1114,38 @@ module Sound(
     .io_addr_1_out   (nmkOki1AddrOut)
   );
 
+  CavePwrInst2OkiRomCache pwrinst2_oki_0_rom_cache (
+    .clock           (clock),
+    .reset           (reset | ~pwrinst2Z80Sound | io_ss_hold),
+    .io_client_rd    (oki0RomRead),
+    .io_client_addr  (oki0MappedAddr),
+    .io_client_dout  (pwrinst2Oki0CacheDout),
+    .io_client_valid (pwrinst2Oki0CacheValid),
+    .io_mem_rd       (pwrinst2Oki0MemRead),
+    .io_mem_addr     (pwrinst2Oki0MemAddr),
+    .io_mem_dout     (io_rom_1_dout),
+    .io_mem_valid    (io_rom_1_valid),
+    .io_idle         (pwrinst2Oki0RomCacheIdle)
+  );
+
+  CavePwrInst2OkiRomCache pwrinst2_oki_1_rom_cache (
+    .clock           (clock),
+    .reset           (reset | ~pwrinst2Z80Sound | io_ss_hold),
+    .io_client_rd    (oki1RomRead),
+    .io_client_addr  (oki1MappedAddr),
+    .io_client_dout  (pwrinst2Oki1CacheDout),
+    .io_client_valid (pwrinst2Oki1CacheValid),
+    .io_mem_rd       (pwrinst2Oki1MemRead),
+    .io_mem_addr     (pwrinst2Oki1MemAddr),
+    .io_mem_dout     (io_rom_2_dout),
+    .io_mem_valid    (io_rom_2_valid),
+    .io_idle         (pwrinst2Oki1RomCacheIdle)
+  );
+
   CavePwrInst2OKIM6295 #(
     .SS_IDX(8'd36),
-    .FIR_COEFFS("jt6295_up4_soft.hex")
+    .FIR_COEFFS("jt6295_up4_soft.hex"),
+    .FIXED_SAMPLE_CLOCK(1)
   ) oki_0 (
     .clock             (clock),
     .reset             (reset | ~pwrinst2Z80Sound),
@@ -1146,7 +1187,8 @@ module Sound(
 
   CavePwrInst2OKIM6295 #(
     .SS_IDX(8'd37),
-    .FIR_COEFFS("jt6295_up4_soft.hex")
+    .FIR_COEFFS("jt6295_up4_soft.hex"),
+    .FIXED_SAMPLE_CLOCK(1)
   ) oki_1 (
     .clock             (clock),
     .reset             (reset | ~pwrinst2Z80Sound),
@@ -1396,8 +1438,8 @@ module Sound(
   assign io_debug = 64'd0;
 `endif
 
-  assign io_rom_1_rd = pwrinst2Z80Sound ? oki0RomRead : activeOki1RomRead;
-  assign io_rom_1_addr = pwrinst2Z80Sound ? oki0MappedAddr : oki1MappedAddr;
-  assign io_rom_2_rd = pwrinst2Z80Sound & oki1RomRead;
-  assign io_rom_2_addr = oki1MappedAddr;
+  assign io_rom_1_rd = pwrinst2Z80Sound ? pwrinst2Oki0MemRead : activeOki1RomRead;
+  assign io_rom_1_addr = pwrinst2Z80Sound ? pwrinst2Oki0MemAddr : oki1MappedAddr;
+  assign io_rom_2_rd = pwrinst2Z80Sound & pwrinst2Oki1MemRead;
+  assign io_rom_2_addr = pwrinst2Oki1MemAddr;
 endmodule

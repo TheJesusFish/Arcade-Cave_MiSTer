@@ -59,12 +59,14 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveLayerProcessor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveMainSupport.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveOKIM6295.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CavePageFlippers.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CavePwrInst2OkiRomCache.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveReadCache.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveRequestQueues.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveSinglePortRam.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveSyncReadMem.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveSyncQueue.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveTrueDualPortRam.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveVideoHScale.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveVideoTiming.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/Cave.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveNvramWriteBackCache.sv

@@ -56,6 +56,7 @@ module Cave(
   output [3:0]  ss_state_debug,
   output [3:0]  ss_last_error,
   output [31:0] service_debug,
+  output [3:0]  game_index,
   input         ioctl_download,
   input         ioctl_upload,
   input         ioctl_rd,
@@ -704,6 +705,7 @@ module Cave(
   wire         optionGameIndexFallback =
     ~ioctl_download & ioctlDownloadReg & ~gameIndexReg_latched;
   wire         effectiveRotate = options_rotate;
+  assign game_index = gameIndexReg;
   wire         videoVBlankFalling = ~videoVBlankPipe1 & videoVBlankPipe2;
   wire         spriteFrameBufferSwap = _main_io_spriteFrameBufferSwap;
 
