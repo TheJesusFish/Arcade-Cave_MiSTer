@@ -73,25 +73,27 @@ localparam CONF_STR = {
   "P1O57,Scandoubler,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
   "P1-;",
   "-;",
-`ifdef CAVE_ENABLE_DEBUG_OVERLAY
-  "P2,Debug;",
-  "P2OA,Sprites,On,Off;",
-  "P2OB,Layer 0,On,Off;",
-  "P2OC,Layer 1,On,Off;",
-  "P2OD,Layer 2,On,Off;",
-  "P2OE,Debug Video,Off,On;",
-  "P2OFH,Debug View,Pipeline,CPU Addr,Writes,Video,Palette,PostPC,RawSprite,Sound;",
-  "P2OM,YM PSG,On,Off;",
-  "P2ON,YM FM,On,Off;",
-  "P2OO,OKI0,On,Off;",
-  "P2OP,OKI1,On,Off;",
-  "P2O[28:26],PI2 OKI0 Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
-  "P2O[31:29],PI2 OKI1 Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
-  "P2O[32],PI2 Headroom,On,Off;",
-  "P2O[35:33],PI2 PSG Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
-  "P2O[38:36],PI2 FM Trim,100%,75%,50%,125%,150%,200%,250%,300%;",
-  "P2OIL,PCB,Dangun Feveron,DoDonPachi,DonPachi,ESP Ra.De.,Puzzle Uo Poko,Guwange,Gaia,Power Instinct 2,Gogetsuji Legends;",
+  "P2,Audio Options;",
+  "P2O[55:52],YM2203 PSG Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "P2O[59:56],YM2203 FM Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "P2O[63:60],OKI0 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "P2O[67:64],OKI1 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
   "P2-;",
+  "-;",
+`ifdef CAVE_ENABLE_DEBUG_OVERLAY
+  "P3,Debug;",
+  "P3OA,Sprites,On,Off;",
+  "P3OB,Layer 0,On,Off;",
+  "P3OC,Layer 1,On,Off;",
+  "P3OD,Layer 2,On,Off;",
+  "P3OE,Debug Video,Off,On;",
+  "P3OFH,Debug View,Pipeline,CPU Addr,Writes,Video,Palette,PostPC,RawSprite,Sound;",
+  "P3OM,YM PSG,On,Off;",
+  "P3ON,YM FM,On,Off;",
+  "P3OO,OKI0,On,Off;",
+  "P3OP,OKI1,On,Off;",
+  "P3OIL,PCB,Dangun Feveron,DoDonPachi,DonPachi,ESP Ra.De.,Puzzle Uo Poko,Guwange,Gaia,Power Instinct 2,Gogetsuji Legends;",
+  "P3-;",
   "-;",
 `endif
   "O[42:41],Savestate Slot,1,2,3,4;",
@@ -118,7 +120,7 @@ localparam CONF_STR = {
   "Restore state 3,",
   "Save to state 4,",
   "Restore state 4;",
-  "v,1;",
+  "v,2;",
   "V,v",`BUILD_DATE," by nullobject;"
 };
 
@@ -406,11 +408,6 @@ wire option_ym_psg = ~status[22];
 wire option_ym_fm = ~status[23];
 wire option_oki_0 = ~status[24];
 wire option_oki_1 = ~status[25];
-wire [2:0] option_pwrinst2_oki0_level = status[28:26];
-wire [2:0] option_pwrinst2_oki1_level = status[31:29];
-wire option_pwrinst2_headroom = ~status[32];
-wire [2:0] option_pwrinst2_psg_level = status[35:33];
-wire [2:0] option_pwrinst2_fm_level = status[38:36];
 wire [3:0] option_offset_x = 4'h0;
 wire [3:0] option_offset_y = 4'h0;
 `else
@@ -424,14 +421,14 @@ wire option_ym_psg = 1'b1;
 wire option_ym_fm = 1'b1;
 wire option_oki_0 = 1'b1;
 wire option_oki_1 = 1'b1;
-wire [2:0] option_pwrinst2_oki0_level = 3'd0;
-wire [2:0] option_pwrinst2_oki1_level = 3'd0;
-wire option_pwrinst2_headroom = 1'b1;
-wire [2:0] option_pwrinst2_psg_level = 3'd0;
-wire [2:0] option_pwrinst2_fm_level = 3'd0;
 wire [3:0] option_offset_x = status[27:24];
 wire [3:0] option_offset_y = status[31:28];
 `endif
+wire [3:0] option_pwrinst2_psg_level = status[55:52];
+wire [3:0] option_pwrinst2_fm_level = status[59:56];
+wire [3:0] option_pwrinst2_oki0_level = status[63:60];
+wire [3:0] option_pwrinst2_oki1_level = status[67:64];
+wire option_pwrinst2_headroom = 1'b1;
 wire [2:0] sl = fx ? fx - 1'd1 : 3'd0;
 wire hscale_enable = status[46];
 wire signed [4:0] hscale = status[51:47];

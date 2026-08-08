@@ -5,11 +5,11 @@
 module AudioMixer (
   input         clock,
   input         io_pwrinst2,
-  input  [2:0]  io_pwrinst2_oki0_level,
-  input  [2:0]  io_pwrinst2_oki1_level,
+  input  [3:0]  io_pwrinst2_oki0_level,
+  input  [3:0]  io_pwrinst2_oki1_level,
   input         io_pwrinst2_headroom,
-  input  [2:0]  io_pwrinst2_psg_level,
-  input  [2:0]  io_pwrinst2_fm_level,
+  input  [3:0]  io_pwrinst2_psg_level,
+  input  [3:0]  io_pwrinst2_fm_level,
   input  [13:0] io_in_4,
   input  [13:0] io_in_3,
   input  [15:0] io_in_2,
@@ -20,20 +20,55 @@ module AudioMixer (
   localparam signed [34:0] MIN_SAMPLE = -35'sd32768;
   localparam signed [34:0] MAX_SAMPLE =  35'sd32767;
 
-  function automatic signed [31:0] pwrinst2_apply_trim;
+  wire [15:0] pwrinst2_levels_async = {
+    io_pwrinst2_fm_level,
+    io_pwrinst2_psg_level,
+    io_pwrinst2_oki1_level,
+    io_pwrinst2_oki0_level
+  };
+  (* preserve, useioff = 0, altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS"} *)
+  reg [15:0] pwrinst2_levels_meta = 16'd0;
+  (* preserve, useioff = 0, altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS"} *)
+  reg [15:0] pwrinst2_levels_sync = 16'd0;
+  reg [15:0] pwrinst2_levels_confirm = 16'd0;
+  reg [15:0] pwrinst2_levels_stable = 16'd0;
+
+  // Menu fields originate on clk_sys. Accept a new packed value only after two
+  // synchronized samples match so a multi-bit transition cannot set a mixed gain.
+  always @(posedge clock) begin
+    pwrinst2_levels_meta <= pwrinst2_levels_async;
+    pwrinst2_levels_sync <= pwrinst2_levels_meta;
+    pwrinst2_levels_confirm <= pwrinst2_levels_sync;
+    if (pwrinst2_levels_confirm == pwrinst2_levels_sync)
+      pwrinst2_levels_stable <= pwrinst2_levels_confirm;
+  end
+
+  wire [3:0] pwrinst2_oki0_level = pwrinst2_levels_stable[3:0];
+  wire [3:0] pwrinst2_oki1_level = pwrinst2_levels_stable[7:4];
+  wire [3:0] pwrinst2_psg_level  = pwrinst2_levels_stable[11:8];
+  wire [3:0] pwrinst2_fm_level   = pwrinst2_levels_stable[15:12];
+
+  function automatic signed [31:0] pwrinst2_apply_boost;
     input signed [31:0] base;
-    input [2:0] level;
+    input [3:0] level;
+    reg signed [12:0] scale;
+    reg signed [44:0] product;
     begin
       case (level)
-        3'd1: pwrinst2_apply_trim = (base >>> 1) + (base >>> 2);
-        3'd2: pwrinst2_apply_trim = base >>> 1;
-        3'd3: pwrinst2_apply_trim = base + (base >>> 2);
-        3'd4: pwrinst2_apply_trim = base + (base >>> 1);
-        3'd5: pwrinst2_apply_trim = base <<< 1;
-        3'd6: pwrinst2_apply_trim = (base <<< 1) + (base >>> 1);
-        3'd7: pwrinst2_apply_trim = (base <<< 1) + base;
-        default: pwrinst2_apply_trim = base;
+        4'd1: scale = 13'sd1126;
+        4'd2: scale = 13'sd1229;
+        4'd3: scale = 13'sd1331;
+        4'd4: scale = 13'sd1434;
+        4'd5: scale = 13'sd1536;
+        4'd6: scale = 13'sd1638;
+        4'd7: scale = 13'sd1741;
+        4'd8: scale = 13'sd1843;
+        4'd9: scale = 13'sd1946;
+        4'd10: scale = 13'sd2048;
+        default: scale = 13'sd1024;
       endcase
+      product = base * scale;
+      pwrinst2_apply_boost = product >>> 10;
     end
   endfunction
 
@@ -65,24 +100,23 @@ module AudioMixer (
     $signed({{13{pwrinst2_psg_sample[18]}}, pwrinst2_psg_sample});
   wire signed [31:0] pwrinst2_fm_base =
     $signed({{13{pwrinst2_fm_sample[18]}}, pwrinst2_fm_sample});
-  // MAME routes each YM2203 output and OKI0 at 0.8, and OKI1 at 1.0.
-  // JT49's combined PSG output is half the normalized amplitude of MAME's
-  // three separate PSG streams, so it uses the same 0.8 aggregate gain.
-  // Headroom divides these anchors by four; 51/64 approximates 0.8.
-  wire signed [31:0] pwrinst2_psg_anchor =
-    (pwrinst2_psg_base <<< 1) + pwrinst2_psg_base +
-    (pwrinst2_psg_base >>> 3) + (pwrinst2_psg_base >>> 4);
-  wire signed [31:0] pwrinst2_fm_anchor =
-    (pwrinst2_fm_base <<< 1) + pwrinst2_fm_base +
-    (pwrinst2_fm_base >>> 3) + (pwrinst2_fm_base >>> 4);
-  wire signed [31:0] pwrinst2_oki0_anchor =
-    (pwrinst2_oki0_base <<< 1) + pwrinst2_oki0_base +
-    (pwrinst2_oki0_base >>> 3) + (pwrinst2_oki0_base >>> 4);
-  wire signed [31:0] pwrinst2_oki1_anchor = pwrinst2_oki1_base <<< 2;
-  wire signed [31:0] pwrinst2_psg_gain = pwrinst2_apply_trim(pwrinst2_psg_anchor, io_pwrinst2_psg_level);
-  wire signed [31:0] pwrinst2_fm_gain = pwrinst2_apply_trim(pwrinst2_fm_anchor, io_pwrinst2_fm_level);
-  wire signed [31:0] pwrinst2_oki0_gain = pwrinst2_apply_trim(pwrinst2_oki0_anchor, io_pwrinst2_oki0_level);
-  wire signed [31:0] pwrinst2_oki1_gain = pwrinst2_apply_trim(pwrinst2_oki1_anchor, io_pwrinst2_oki1_level);
+  // Zero boost preserves the MiSTer-devel FPGA-path compensation. MAME's
+  // routing is PSG A/B/C at 0.40, FM at 0.80, OKI0 at 0.80, and OKI1 at 1.00;
+  // these anchors account for the implementations' differing raw scales.
+  // Shared headroom divides the anchors by four after per-path boost.
+  wire signed [31:0] pwrinst2_psg_anchor = pwrinst2_psg_base <<< 1;
+  wire signed [31:0] pwrinst2_fm_anchor = pwrinst2_fm_base <<< 4;
+  wire signed [31:0] pwrinst2_oki0_anchor = pwrinst2_oki0_base <<< 3;
+  wire signed [31:0] pwrinst2_oki1_anchor =
+    (pwrinst2_oki1_base <<< 2) + (pwrinst2_oki1_base <<< 1);
+  wire signed [31:0] pwrinst2_psg_gain =
+    pwrinst2_apply_boost(pwrinst2_psg_anchor, pwrinst2_psg_level);
+  wire signed [31:0] pwrinst2_fm_gain =
+    pwrinst2_apply_boost(pwrinst2_fm_anchor, pwrinst2_fm_level);
+  wire signed [31:0] pwrinst2_oki0_gain =
+    pwrinst2_apply_boost(pwrinst2_oki0_anchor, pwrinst2_oki0_level);
+  wire signed [31:0] pwrinst2_oki1_gain =
+    pwrinst2_apply_boost(pwrinst2_oki1_anchor, pwrinst2_oki1_level);
   wire signed [34:0] pwrinst2_mix_sum =
     $signed({{3{pwrinst2_psg_gain[31]}}, pwrinst2_psg_gain})
     + $signed({{3{pwrinst2_fm_gain[31]}}, pwrinst2_fm_gain})
