@@ -5,11 +5,14 @@
 module AudioMixer (
   input         clock,
   input         io_pwrinst2,
+  input         io_ymz,
+  input         io_legacy_oki,
   input  [3:0]  io_pwrinst2_oki0_level,
   input  [3:0]  io_pwrinst2_oki1_level,
   input         io_pwrinst2_headroom,
   input  [3:0]  io_pwrinst2_psg_level,
   input  [3:0]  io_pwrinst2_fm_level,
+  input  [3:0]  io_ymz_level,
   input  [13:0] io_in_4,
   input  [13:0] io_in_3,
   input  [15:0] io_in_2,
@@ -20,35 +23,37 @@ module AudioMixer (
   localparam signed [34:0] MIN_SAMPLE = -35'sd32768;
   localparam signed [34:0] MAX_SAMPLE =  35'sd32767;
 
-  wire [15:0] pwrinst2_levels_async = {
+  wire [19:0] audio_levels_async = {
+    io_ymz_level,
     io_pwrinst2_fm_level,
     io_pwrinst2_psg_level,
     io_pwrinst2_oki1_level,
     io_pwrinst2_oki0_level
   };
   (* preserve, useioff = 0, altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS"} *)
-  reg [15:0] pwrinst2_levels_meta = 16'd0;
+  reg [19:0] audio_levels_meta = 20'd0;
   (* preserve, useioff = 0, altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS"} *)
-  reg [15:0] pwrinst2_levels_sync = 16'd0;
-  reg [15:0] pwrinst2_levels_confirm = 16'd0;
-  reg [15:0] pwrinst2_levels_stable = 16'd0;
+  reg [19:0] audio_levels_sync = 20'd0;
+  reg [19:0] audio_levels_confirm = 20'd0;
+  reg [19:0] audio_levels_stable = 20'd0;
 
   // Menu fields originate on clk_sys. Accept a new packed value only after two
   // synchronized samples match so a multi-bit transition cannot set a mixed gain.
   always @(posedge clock) begin
-    pwrinst2_levels_meta <= pwrinst2_levels_async;
-    pwrinst2_levels_sync <= pwrinst2_levels_meta;
-    pwrinst2_levels_confirm <= pwrinst2_levels_sync;
-    if (pwrinst2_levels_confirm == pwrinst2_levels_sync)
-      pwrinst2_levels_stable <= pwrinst2_levels_confirm;
+    audio_levels_meta <= audio_levels_async;
+    audio_levels_sync <= audio_levels_meta;
+    audio_levels_confirm <= audio_levels_sync;
+    if (audio_levels_confirm == audio_levels_sync)
+      audio_levels_stable <= audio_levels_confirm;
   end
 
-  wire [3:0] pwrinst2_oki0_level = pwrinst2_levels_stable[3:0];
-  wire [3:0] pwrinst2_oki1_level = pwrinst2_levels_stable[7:4];
-  wire [3:0] pwrinst2_psg_level  = pwrinst2_levels_stable[11:8];
-  wire [3:0] pwrinst2_fm_level   = pwrinst2_levels_stable[15:12];
+  wire [3:0] pwrinst2_oki0_level = audio_levels_stable[3:0];
+  wire [3:0] pwrinst2_oki1_level = audio_levels_stable[7:4];
+  wire [3:0] pwrinst2_psg_level  = audio_levels_stable[11:8];
+  wire [3:0] pwrinst2_fm_level   = audio_levels_stable[15:12];
+  wire [3:0] ymz_level           = audio_levels_stable[19:16];
 
-  function automatic signed [31:0] pwrinst2_apply_boost;
+  function automatic signed [31:0] apply_boost;
     input signed [31:0] base;
     input [3:0] level;
     reg signed [12:0] scale;
@@ -68,7 +73,7 @@ module AudioMixer (
         default: scale = 13'sd1024;
       endcase
       product = base * scale;
-      pwrinst2_apply_boost = product >>> 10;
+      apply_boost = product >>> 10;
     end
   endfunction
 
@@ -87,6 +92,42 @@ module AudioMixer (
     + $signed({{4{channel_3_gain[21]}}, channel_3_gain})
     + $signed({{6{io_in_4[13]}}, io_in_4, 6'b000000});
   wire signed [28:0] legacy_mix_ext = {{3{legacy_mix_sum[25]}}, legacy_mix_sum};
+  wire signed [28:0] legacy_scaled_sum = legacy_mix_ext >>> 4;
+  wire signed [34:0] legacy_default_sum =
+    $signed({{6{legacy_scaled_sum[28]}}, legacy_scaled_sum});
+
+  wire signed [31:0] legacy_ymz_base =
+    $signed({{3{legacy_scaled_sum[28]}}, legacy_scaled_sum});
+  wire signed [31:0] legacy_ymz_gain = apply_boost(legacy_ymz_base, ymz_level);
+  wire signed [34:0] legacy_ymz_sum =
+    $signed({{3{legacy_ymz_gain[31]}}, legacy_ymz_gain});
+
+  wire signed [31:0] legacy_other_pre =
+    $signed({{12{io_in_0[15]}}, io_in_0, 4'b0000})
+    + $signed({{13{channel_1_gain[18]}}, channel_1_gain})
+    + $signed({{12{io_in_2[15]}}, io_in_2, 4'b0000});
+  wire signed [31:0] legacy_oki0_pre =
+    $signed({{10{channel_3_gain[21]}}, channel_3_gain});
+  wire signed [31:0] legacy_oki1_pre =
+    $signed({{12{io_in_4[13]}}, io_in_4, 6'b000000});
+  wire signed [31:0] legacy_oki0_gain =
+    apply_boost(legacy_oki0_pre, pwrinst2_oki0_level);
+  wire signed [31:0] legacy_oki1_gain =
+    apply_boost(legacy_oki1_pre, pwrinst2_oki1_level);
+  wire signed [34:0] legacy_oki_pre_sum =
+    $signed({{3{legacy_other_pre[31]}}, legacy_other_pre})
+    + $signed({{3{legacy_oki0_gain[31]}}, legacy_oki0_gain})
+    + $signed({{3{legacy_oki1_gain[31]}}, legacy_oki1_gain});
+  wire signed [34:0] legacy_oki_sum = legacy_oki_pre_sum >>> 4;
+
+  wire ymz_boost_enabled = io_ymz && (ymz_level >= 4'd1) && (ymz_level <= 4'd10);
+  wire legacy_oki_boost_enabled = io_legacy_oki &&
+    (((pwrinst2_oki0_level >= 4'd1) && (pwrinst2_oki0_level <= 4'd10)) ||
+     ((pwrinst2_oki1_level >= 4'd1) && (pwrinst2_oki1_level <= 4'd10)));
+  wire signed [34:0] legacy_selected_sum =
+    ymz_boost_enabled ? legacy_ymz_sum :
+    legacy_oki_boost_enabled ? legacy_oki_sum :
+                               legacy_default_sum;
 
   wire signed [18:0] pwrinst2_psg_sample = $signed({3'b000, io_in_1});
   wire signed [18:0] pwrinst2_fm_sample = $signed({{3{io_in_2[15]}}, io_in_2});
@@ -110,13 +151,13 @@ module AudioMixer (
   wire signed [31:0] pwrinst2_oki1_anchor =
     (pwrinst2_oki1_base <<< 2) + (pwrinst2_oki1_base <<< 1);
   wire signed [31:0] pwrinst2_psg_gain =
-    pwrinst2_apply_boost(pwrinst2_psg_anchor, pwrinst2_psg_level);
+    apply_boost(pwrinst2_psg_anchor, pwrinst2_psg_level);
   wire signed [31:0] pwrinst2_fm_gain =
-    pwrinst2_apply_boost(pwrinst2_fm_anchor, pwrinst2_fm_level);
+    apply_boost(pwrinst2_fm_anchor, pwrinst2_fm_level);
   wire signed [31:0] pwrinst2_oki0_gain =
-    pwrinst2_apply_boost(pwrinst2_oki0_anchor, pwrinst2_oki0_level);
+    apply_boost(pwrinst2_oki0_anchor, pwrinst2_oki0_level);
   wire signed [31:0] pwrinst2_oki1_gain =
-    pwrinst2_apply_boost(pwrinst2_oki1_anchor, pwrinst2_oki1_level);
+    apply_boost(pwrinst2_oki1_anchor, pwrinst2_oki1_level);
   wire signed [34:0] pwrinst2_mix_sum =
     $signed({{3{pwrinst2_psg_gain[31]}}, pwrinst2_psg_gain})
     + $signed({{3{pwrinst2_fm_gain[31]}}, pwrinst2_fm_gain})
@@ -125,10 +166,9 @@ module AudioMixer (
   wire signed [34:0] pwrinst2_scaled_sum =
     io_pwrinst2_headroom ? (pwrinst2_mix_sum >>> 2) : (pwrinst2_mix_sum >>> 1);
 
-  wire signed [28:0] legacy_scaled_sum = legacy_mix_ext >>> 4;
   wire signed [34:0] scaled_sum =
     io_pwrinst2 ? pwrinst2_scaled_sum :
-                  $signed({{6{legacy_scaled_sum[28]}}, legacy_scaled_sum});
+                  legacy_selected_sum;
   wire signed [34:0] clipped_low = scaled_sum < MIN_SAMPLE ? MIN_SAMPLE : scaled_sum;
   wire signed [34:0] clipped = clipped_low < MAX_SAMPLE ? clipped_low : MAX_SAMPLE;
 

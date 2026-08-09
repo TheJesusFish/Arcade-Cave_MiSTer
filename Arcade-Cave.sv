@@ -74,10 +74,11 @@ localparam CONF_STR = {
   "P1-;",
   "-;",
   "P2,Audio Options;",
-  "P2O[55:52],YM2203 PSG Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
-  "P2O[59:56],YM2203 FM Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
-  "P2O[63:60],OKI0 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
-  "P2O[67:64],OKI1 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "h4P2O[55:52],YM2203 PSG Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "h4P2O[59:56],YM2203 FM Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "h3P2O[63:60],OKI0 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "h3P2O[67:64],OKI1 Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
+  "h2P2O[71:68],YMZ280B Boost,0%,10%,20%,30%,40%,50%,60%,70%,80%,90%,100%;",
   "P2-;",
   "-;",
 `ifdef CAVE_ENABLE_DEBUG_OVERLAY
@@ -262,6 +263,20 @@ wire cave_game_is_vertical =
   cave_game_index == 4'd2 ||
   cave_game_index == 4'd3 ||
   cave_game_index == 4'd5;
+wire cave_audio_is_ymz =
+  cave_game_index == 4'd0 ||
+  cave_game_index == 4'd1 ||
+  cave_game_index == 4'd3 ||
+  cave_game_index == 4'd4 ||
+  cave_game_index == 4'd5 ||
+  cave_game_index == 4'd6;
+wire cave_audio_has_oki =
+  cave_game_index == 4'd2 ||
+  cave_game_index == 4'd7 ||
+  cave_game_index == 4'd8;
+wire cave_audio_has_ym2203 =
+  cave_game_index == 4'd7 ||
+  cave_game_index == 4'd8;
 wire rotate_screen = cave_game_is_vertical ? ~status[3] : status[3];
 
 hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
@@ -272,7 +287,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
   .status(status),
   .status_in(status_in),
   .status_set(ss_status_update),
-  .status_menumask({14'd0, cave_game_is_vertical, direct_video}),
+  .status_menumask({11'd0, cave_audio_has_ym2203, cave_audio_has_oki,
+                   cave_audio_is_ymz, cave_game_is_vertical, direct_video}),
   .forced_scandoubler(forced_scandoubler),
   .new_vmode(new_vmode),
   .gamma_bus(gamma_bus),
@@ -428,6 +444,7 @@ wire [3:0] option_pwrinst2_psg_level = status[55:52];
 wire [3:0] option_pwrinst2_fm_level = status[59:56];
 wire [3:0] option_pwrinst2_oki0_level = status[63:60];
 wire [3:0] option_pwrinst2_oki1_level = status[67:64];
+wire [3:0] option_ymz_level = status[71:68];
 wire option_pwrinst2_headroom = 1'b1;
 wire [2:0] sl = fx ? fx - 1'd1 : 3'd0;
 wire hscale_enable = status[46];
@@ -665,6 +682,7 @@ Cave cave (
   .options_pwrinst2_headroom(option_pwrinst2_headroom),
   .options_pwrinst2_psg_level(option_pwrinst2_psg_level),
   .options_pwrinst2_fm_level(option_pwrinst2_fm_level),
+  .options_ymz_level(option_ymz_level),
   // Joystick signals
   .player_0_up(player_1_up),
   .player_0_down(player_1_down),
