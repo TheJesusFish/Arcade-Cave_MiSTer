@@ -61,5 +61,5 @@
     <part>01</part>
   </rom>
 
-  <buttons names="Shot/Laser,Bomb,Full-Auto,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
+  <buttons names="Shot/Laser,Bomb,Full-Auto,-,Start,Coin,Pause,-,-,SS" default="A,B,X,R,L,Start" />
 </misterromdescription>

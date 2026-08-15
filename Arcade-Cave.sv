@@ -106,7 +106,7 @@ localparam CONF_STR = {
   "T9,Service Mode;",
   "-;",
   "R0,Reset;",
-  "J,B0,B1,B2,B3,Start,Coin,Pause;",
+  "J,B0,B1,B2,B3,Start,Coin,Pause,-,-,SS;",
   "I,",
   "Load=DPAD Up|Save=Down|Slot=L+R,",
   "Active Slot 1,",

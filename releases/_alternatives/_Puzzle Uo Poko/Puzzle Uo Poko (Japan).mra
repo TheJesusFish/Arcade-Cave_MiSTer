@@ -37,5 +37,5 @@
   <!-- NVRAM -->
   <nvram index="2" size="128" />
 
-  <buttons names="-,-,-,-,Start,Coin,Pause" default="A,B,X,R,L,Start" />
+  <buttons names="-,-,-,-,Start,Coin,Pause,-,-,SS" default="A,B,X,R,L,Start" />
 </misterromdescription>
