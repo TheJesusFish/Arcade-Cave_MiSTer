@@ -8,6 +8,9 @@
 module Main(
   input          clock,
   input          reset,
+  input          io_systemClock,
+  input          io_systemReset,
+  input          io_highScoreReset,
   input          io_videoClock,
   input          io_spriteClock,
   input  [3:0]   io_gameIndex,
@@ -127,6 +130,20 @@ module Main(
   input  [15:0]  io_eeprom_dout,
   input          io_eeprom_wait_n,
   input          io_eeprom_valid,
+  input          io_hs_config_download,
+  input          io_hs_config_wr,
+  input  [26:0]  io_hs_config_addr,
+  input  [15:0]  io_hs_config_dout,
+  input          io_hs_nvram_download,
+  input          io_hs_nvram_upload,
+  input          io_hs_nvram_rd,
+  input          io_hs_nvram_wr,
+  input  [26:0]  io_hs_nvram_addr,
+  input  [15:0]  io_hs_nvram_dout,
+  output [15:0]  io_hs_nvram_din,
+  output         io_hs_nvram_wait_n,
+  output         io_hs_dirty,
+  output         io_hs_active,
   output         io_spriteFrameBufferSwap,
   input          io_ss_hold,
   input          io_ss_capture_request,
@@ -249,7 +266,19 @@ module Main(
   wire        mainRamPhysicalWr;
   wire [1:0]  mainRamPhysicalMask;
   wire [15:0] mainRamPhysicalDin;
+  wire        mainRamSaveStateRd;
+  wire        mainRamSaveStateWr;
+  wire [1:0]  mainRamSaveStateMask;
+  wire [14:0] mainRamSaveStateAddr;
+  wire [15:0] mainRamSaveStateDin;
   wire        mainRamBlockedAccess;
+  wire        highScoreCpuHold;
+  wire        highScoreRamOwned;
+  wire        highScoreRamRd;
+  wire        highScoreRamWr;
+  wire [14:0] highScoreRamAddr;
+  wire [1:0]  highScoreRamMask;
+  wire [15:0] highScoreRamDin;
   wire        _eeprom_io_serial_sdo;
   wire        eepromSaveStateIdle;
   wire        _cpu_io_vpa;
@@ -4455,7 +4484,7 @@ module Main(
     .clock                      (clock),
     .reset                      (reset),
     .io_halt                    (pauseActive),
-    .io_ss_hold                 (io_ss_hold),
+    .io_ss_hold                 (io_ss_hold | highScoreCpuHold),
     .io_ss_capture_request      (io_ss_capture_request),
     .io_ss_restore_enable       (io_ss_restore_enable),
     .io_ss_restore_start        (io_ss_restore_start),
@@ -4498,6 +4527,40 @@ module Main(
     .io_serial_sdo (_eeprom_io_serial_sdo)
   );
   assign io_ss_clients_idle = eepromSaveStateIdle;
+  CaveHighScoreManager highScoreManager (
+    .sys_clock        (io_systemClock),
+    .sys_reset        (io_systemReset),
+    .cpu_clock        (clock),
+    .cpu_reset        (io_highScoreReset),
+    .config_download  (io_hs_config_download),
+    .config_wr        (io_hs_config_wr),
+    .config_addr      (io_hs_config_addr),
+    .config_dout      (io_hs_config_dout),
+    .nvram_download   (io_hs_nvram_download),
+    .nvram_upload     (io_hs_nvram_upload),
+    .nvram_rd         (io_hs_nvram_rd),
+    .nvram_wr         (io_hs_nvram_wr),
+    .nvram_addr       (io_hs_nvram_addr),
+    .nvram_dout       (io_hs_nvram_dout),
+    .nvram_din        (io_hs_nvram_din),
+    .nvram_wait_n     (io_hs_nvram_wait_n),
+    .ss_hold_cpu      (io_ss_hold),
+    .cpu_idle         (io_ss_cpu_idle),
+    .normal_ram_wr    (mainRam_io_wr),
+    .normal_byte_addr (cpuByteAddr),
+    .normal_ram_mask  (mainRam_io_mask),
+    .normal_ram_din   (_cpu_io_dout),
+    .cpu_hold         (highScoreCpuHold),
+    .ram_owned        (highScoreRamOwned),
+    .ram_rd           (highScoreRamRd),
+    .ram_wr           (highScoreRamWr),
+    .ram_addr         (highScoreRamAddr),
+    .ram_mask         (highScoreRamMask),
+    .ram_din          (highScoreRamDin),
+    .ram_dout         (_mainRam_io_dout),
+    .dirty_sys        (io_hs_dirty),
+    .active_sys       (io_hs_active)
+  );
   CaveSaveStateRamPort #(
     .WIDTH        (16),
     .ADDR_WIDTH   (15),
@@ -4514,15 +4577,25 @@ module Main(
     .normal_mask    (mainRam_io_mask),
     .normal_addr    (_cpu_io_addr[14:0]),
     .normal_data    (_cpu_io_dout),
-    .ram_rd         (mainRamPhysicalRd),
-    .ram_wr         (mainRamPhysicalWr),
-    .ram_mask       (mainRamPhysicalMask),
-    .ram_addr       (_mainRam_io_addr),
-    .ram_data       (mainRamPhysicalDin),
+    .ram_rd         (mainRamSaveStateRd),
+    .ram_wr         (mainRamSaveStateWr),
+    .ram_mask       (mainRamSaveStateMask),
+    .ram_addr       (mainRamSaveStateAddr),
+    .ram_data       (mainRamSaveStateDin),
     .ram_q          (_mainRam_io_dout),
     .blocked_access (mainRamBlockedAccess),
     .ssbus          (mainSaveStateOwners[1])
   );
+  assign mainRamPhysicalRd = highScoreRamOwned
+    ? highScoreRamRd : mainRamSaveStateRd;
+  assign mainRamPhysicalWr = highScoreRamOwned
+    ? highScoreRamWr : mainRamSaveStateWr;
+  assign mainRamPhysicalMask = highScoreRamOwned
+    ? highScoreRamMask : mainRamSaveStateMask;
+  assign _mainRam_io_addr = highScoreRamOwned
+    ? highScoreRamAddr : mainRamSaveStateAddr;
+  assign mainRamPhysicalDin = highScoreRamOwned
+    ? highScoreRamDin : mainRamSaveStateDin;
   CaveSinglePortRam #(
     .ADDR_WIDTH  (15),
     .DATA_WIDTH  (16),

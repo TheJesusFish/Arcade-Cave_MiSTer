@@ -102,6 +102,9 @@ localparam CONF_STR = {
   "R[44],Save state (Alt-F1);",
   "R[45],Restore state (F1);",
   "-;",
+  "O[72],Autosave NVRAM,Off,On;",
+  "T[73],Save NVRAM;",
+  "-;",
   "DIP;",
   "T9,Service Mode;",
   "-;",
@@ -230,6 +233,7 @@ wire        direct_video;
 wire [15:0] sdram_sz;
 
 wire        ioctl_upload;
+reg         ioctl_upload_req = 1'b0;
 wire        ioctl_download;
 wire        ioctl_rd;
 wire        ioctl_wr;
@@ -238,6 +242,7 @@ wire  [7:0] ioctl_index;
 wire [26:0] ioctl_addr;
 wire [15:0] ioctl_din;
 wire [15:0] ioctl_dout;
+wire        nvram_dirty;
 
 wire [10:0] ps2_key;
 wire [31:0] joystick_0, joystick_1;
@@ -296,6 +301,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
   .sdram_sz(sdram_sz),
 
   .ioctl_upload(ioctl_upload),
+  .ioctl_upload_req(ioctl_upload_req),
+  .ioctl_upload_index(8'h02),
   .ioctl_download(ioctl_download),
   .ioctl_rd(ioctl_rd),
   .ioctl_wr(ioctl_wr),
@@ -313,6 +320,16 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io (
   .info_req(ss_info_request),
   .info(ss_info)
 );
+
+reg osd_status_d = 1'b0;
+reg nvram_save_d = 1'b0;
+always @(posedge clk_sys) begin
+  osd_status_d <= OSD_STATUS;
+  nvram_save_d <= status[73];
+  ioctl_upload_req <=
+    (status[72] && nvram_dirty && OSD_STATUS && !osd_status_d) ||
+    (status[73] && !nvram_save_d);
+end
 
 CaveSaveStateUi saveStateUi (
   .clk            (clk_sys),
@@ -761,6 +778,7 @@ Cave cave (
   .ioctl_addr(ioctl_addr),
   .ioctl_din(ioctl_din),
   .ioctl_dout(ioctl_dout),
+  .nvram_dirty(nvram_dirty),
   // RGB output
   .rgb(rgb),
   // Audio output

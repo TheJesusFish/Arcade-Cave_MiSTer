@@ -58,6 +58,14 @@ __pycache__/
 /sim/
 /tools/
 
+# Retained regression for the Cave-local high-score NVRAM manager.
+/sim/
+/sim/*
+/sim/highscore/
+/sim/highscore/*
+/sim/highscore/*.sv
+/sim/highscore/run.ps1
+
 # ModelSim, Verilator, and waveform output
 obj_dir/
 modelsim.ini
