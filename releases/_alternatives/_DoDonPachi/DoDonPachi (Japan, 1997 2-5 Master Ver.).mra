@@ -1,6 +1,6 @@
 <misterromdescription>
   <name>DoDonPachi (Japan, 1997 2/ 5 Master Ver.)</name>
-  <mameversion>0288</mameversion>
+  <mameversion>0289</mameversion>
   <setname>ddonpachj</setname>
   <year>1997</year>
   <manufacturer>CAVE</manufacturer>
@@ -9,7 +9,7 @@
   <rbf>cave</rbf>
 
   <!-- ROM data -->
-  <rom index="0" zip="ddonpach.zip|ddonpachj.zip" md5="none" address="0x30000000">
+  <rom index="0" zip="ddonpachj.zip|ddonpach.zip" md5="none" address="0x30000000">
     <!-- prog ROM -->
     <interleave output="16">
       <part name="u27.bin" crc="2432ff9b" map="01" />

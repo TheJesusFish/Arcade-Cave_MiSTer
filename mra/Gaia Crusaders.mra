@@ -1,11 +1,12 @@
 <misterromdescription>
   <name>Gaia Crusaders</name>
-  <mameversion>0226</mameversion>
+  <mameversion>0289</mameversion>
   <setname>gaia</setname>
   <year>1999</year>
   <manufacturer>CAVE</manufacturer>
+  <rotation>horizontal</rotation>
   <category>Fighting</category>
-  <rbf>Cave</rbf>
+  <rbf>cave</rbf>
 
   <!-- ROM data -->
   <rom index="0" zip="gaia.zip" md5="none" address="0x30000000">

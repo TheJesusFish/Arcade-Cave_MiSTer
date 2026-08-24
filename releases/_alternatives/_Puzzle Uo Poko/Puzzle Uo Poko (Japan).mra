@@ -1,6 +1,6 @@
 <misterromdescription>
   <name>Puzzle Uo Poko (Japan)</name>
-  <mameversion>0288</mameversion>
+  <mameversion>0289</mameversion>
   <setname>uopokoj</setname>
   <year>1998</year>
   <manufacturer>CAVE</manufacturer>
@@ -12,8 +12,8 @@
   <rom index="0" zip="uopokoj.zip|uopoko.zip" md5="none" address="0x30000000">
     <!-- prog ROM -->
     <interleave output="16">
-      <part name="u26.bin" crc="e7eec050" map="01" />
-      <part name="u25.bin" crc="68cb6211" map="10" />
+      <part name="u26j.u26" crc="e7eec050" map="01" />
+      <part name="u25j.u25" crc="68cb6211" map="10" />
     </interleave>
 
     <!-- EEPROM -->

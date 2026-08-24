@@ -1,6 +1,6 @@
 <misterromdescription>
   <name>ESP Ra.De. (Japan, 1998 4/14 Master Ver.)</name>
-  <mameversion>0288</mameversion>
+  <mameversion>0289</mameversion>
   <setname>espradejo</setname>
   <year>1998</year>
   <manufacturer>CAVE</manufacturer>
@@ -12,8 +12,8 @@
   <rom index="0" zip="espradejo.zip|esprade.zip" md5="none" address="0x30000000">
     <!-- prog ROM -->
     <interleave output="16">
-      <part name="u42_ver.2" crc="75d03c42" map="01" />
-      <part name="u41_ver.2" crc="734b3ef0" map="10" />
+      <part name="u42.bin" crc="0718c7e5" map="01" />
+      <part name="u41.bin" crc="def30539" map="10" />
     </interleave>
 
     <!-- EEPROM -->
