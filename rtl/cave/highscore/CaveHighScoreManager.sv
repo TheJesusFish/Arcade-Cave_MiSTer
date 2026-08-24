@@ -39,8 +39,10 @@ module CaveHighScoreManager (
   output        active_sys
 );
 
-  localparam [26:0] NVRAM_SCORE_BASE = 27'd128;
-  localparam [26:0] NVRAM_SCORE_END  = 27'd640;
+  localparam [26:0] NVRAM_METADATA_BASE = 27'd128;
+  localparam [26:0] NVRAM_METADATA_END  = 27'd160;
+  localparam [26:0] NVRAM_SCORE_BASE    = 27'd160;
+  localparam [26:0] NVRAM_SCORE_END     = 27'd672;
 
   localparam [3:0] STATE_IDLE          = 4'd0;
   localparam [3:0] STATE_RESTORE_HOLD  = 4'd1;
@@ -148,11 +150,46 @@ module CaveHighScoreManager (
     end
   end
 
+  wire metadata_nvram_address =
+    (nvram_addr >= NVRAM_METADATA_BASE) &&
+    (nvram_addr < NVRAM_METADATA_END);
   wire score_nvram_address =
     (nvram_addr >= NVRAM_SCORE_BASE) && (nvram_addr < NVRAM_SCORE_END);
-  wire [8:0] score_byte_offset_sys = nvram_addr[9:0] - 10'd128;
+  wire [3:0] metadata_word_address_sys = nvram_addr[4:1];
+  reg  [15:0] expected_metadata_word_sys;
+  always @* begin
+    case (metadata_word_address_sys)
+      4'd0: expected_metadata_word_sys = 16'h4356; // "CV"
+      4'd1: expected_metadata_word_sys = 16'h4853; // "HS"
+      4'd2: expected_metadata_word_sys = 16'h0120; // schema 1, 32 bytes
+      4'd3: expected_metadata_word_sys = range1_valid_sys
+        ? 16'h0200 : 16'h0100;
+      4'd4: expected_metadata_word_sys = total_length_sys[15:0];
+      4'd5: expected_metadata_word_sys = 16'h0000;
+      4'd6: expected_metadata_word_sys = range0_start_sys[31:16];
+      4'd7: expected_metadata_word_sys = range0_start_sys[15:0];
+      4'd8: expected_metadata_word_sys = range0_length_sys;
+      4'd9: expected_metadata_word_sys =
+        {range0_first_sys, range0_last_sys};
+      4'd10: expected_metadata_word_sys = range1_valid_sys
+        ? range1_start_sys[31:16] : 16'h0000;
+      4'd11: expected_metadata_word_sys = range1_valid_sys
+        ? range1_start_sys[15:0] : 16'h0000;
+      4'd12: expected_metadata_word_sys = range1_valid_sys
+        ? range1_length_sys : 16'h0000;
+      4'd13: expected_metadata_word_sys = range1_valid_sys
+        ? {range1_first_sys, range1_last_sys} : 16'h0000;
+      4'd14: expected_metadata_word_sys = 16'h454E; // "EN"
+      4'd15: expected_metadata_word_sys = 16'h4421; // "D!"
+    endcase
+  end
+  wire [9:0] score_byte_offset_sys = nvram_addr[9:0] - 10'd160;
   wire [7:0] score_word_address_sys = score_byte_offset_sys[8:1];
-  wire [15:0] score_buffer_din_sys = {nvram_dout[7:0], nvram_dout[15:8]};
+  wire [15:0] nvram_file_word_sys =
+    {nvram_dout[7:0], nvram_dout[15:8]};
+  wire [15:0] score_buffer_din_sys = nvram_file_word_sys;
+  wire metadata_wr_sys =
+    nvram_download && nvram_wr && metadata_nvram_address;
   wire load_buffer_wr_sys =
     nvram_download && nvram_wr && score_nvram_address;
   wire load_buffer_rd_sys =
@@ -162,7 +199,12 @@ module CaveHighScoreManager (
   wire [15:0] save_buffer_q_sys;
 
   reg         nvram_download_d;
-  reg         nvram_data_seen_sys;
+  reg  [15:0] metadata_written_sys;
+  reg  [15:0] metadata_words_sys [0:15];
+  reg  [8:0]  score_word_count_sys;
+  reg         score_sequence_error_sys;
+  reg         nvram_payload_ready_sys;
+  reg         nvram_validation_pending_sys;
   reg         nvram_has_data_sys;
   reg         nvram_load_toggle_sys;
 
@@ -188,6 +230,33 @@ module CaveHighScoreManager (
   wire        dirty_cpu;
   wire        active_cpu;
 
+  wire metadata_matches_sys =
+    (metadata_words_sys[0]  == 16'h4356) &&
+    (metadata_words_sys[1]  == 16'h4853) &&
+    (metadata_words_sys[2]  == 16'h0120) &&
+    (metadata_words_sys[3]  ==
+      (range1_valid_sys ? 16'h0200 : 16'h0100)) &&
+    (metadata_words_sys[4]  == total_length_sys[15:0]) &&
+    (metadata_words_sys[5]  == 16'h0000) &&
+    (metadata_words_sys[6]  == range0_start_sys[31:16]) &&
+    (metadata_words_sys[7]  == range0_start_sys[15:0]) &&
+    (metadata_words_sys[8]  == range0_length_sys) &&
+    (metadata_words_sys[9]  ==
+      {range0_first_sys, range0_last_sys}) &&
+    (metadata_words_sys[10] ==
+      (range1_valid_sys ? range1_start_sys[31:16] : 16'h0000)) &&
+    (metadata_words_sys[11] ==
+      (range1_valid_sys ? range1_start_sys[15:0] : 16'h0000)) &&
+    (metadata_words_sys[12] ==
+      (range1_valid_sys ? range1_length_sys : 16'h0000)) &&
+    (metadata_words_sys[13] ==
+      (range1_valid_sys
+        ? {range1_first_sys, range1_last_sys} : 16'h0000)) &&
+    (metadata_words_sys[14] == 16'h454E) &&
+    (metadata_words_sys[15] == 16'h4421);
+  wire [8:0] expected_score_word_count_sys =
+    total_length_sys[9:1] + total_length_sys[0];
+
   always @(posedge sys_clock) begin
     nvram_download_d <= nvram_download;
     capture_done_meta_sys <= capture_done_toggle_cpu;
@@ -201,7 +270,11 @@ module CaveHighScoreManager (
 
     if (sys_reset) begin
       nvram_download_d <= 1'b0;
-      nvram_data_seen_sys <= 1'b0;
+      metadata_written_sys <= 16'd0;
+      score_word_count_sys <= 9'd0;
+      score_sequence_error_sys <= 1'b0;
+      nvram_payload_ready_sys <= 1'b0;
+      nvram_validation_pending_sys <= 1'b0;
       nvram_has_data_sys <= 1'b0;
       nvram_load_toggle_sys <= 1'b0;
       nvram_upload_started_sys <= 1'b0;
@@ -221,14 +294,35 @@ module CaveHighScoreManager (
       active_sync_sys <= 1'b0;
     end else begin
       if (nvram_download && !nvram_download_d) begin
-        nvram_data_seen_sys <= 1'b0;
+        metadata_written_sys <= 16'd0;
+        score_word_count_sys <= 9'd0;
+        score_sequence_error_sys <= 1'b0;
+        nvram_payload_ready_sys <= 1'b0;
+        nvram_validation_pending_sys <= 1'b0;
+        nvram_has_data_sys <= 1'b0;
         snapshot_valid_sys <= 1'b0;
       end
-      if (load_buffer_wr_sys)
-        nvram_data_seen_sys <= 1'b1;
+      if (metadata_wr_sys) begin
+        metadata_written_sys[metadata_word_address_sys] <= 1'b1;
+        metadata_words_sys[metadata_word_address_sys] <= nvram_file_word_sys;
+      end
+      if (load_buffer_wr_sys && !score_sequence_error_sys) begin
+        if (score_byte_offset_sys == {score_word_count_sys, 1'b0})
+          score_word_count_sys <= score_word_count_sys + 9'd1;
+        else
+          score_sequence_error_sys <= 1'b1;
+      end
       if (!nvram_download && nvram_download_d) begin
-        nvram_has_data_sys <= nvram_data_seen_sys;
+        nvram_payload_ready_sys <=
+          (&metadata_written_sys) && !score_sequence_error_sys;
+        nvram_validation_pending_sys <= 1'b1;
+      end
+      if (nvram_validation_pending_sys && config_valid_sys) begin
+        nvram_has_data_sys <=
+          nvram_payload_ready_sys && metadata_matches_sys &&
+          (score_word_count_sys == expected_score_word_count_sys);
         nvram_load_toggle_sys <= ~nvram_load_toggle_sys;
+        nvram_validation_pending_sys <= 1'b0;
       end
 
       if (!nvram_upload) begin
@@ -261,9 +355,13 @@ module CaveHighScoreManager (
 
   assign nvram_wait_n =
     !nvram_upload || !config_valid_sys || upload_ready_sys;
-  assign nvram_din = snapshot_valid_sys
-    ? {save_buffer_q_sys[7:0], save_buffer_q_sys[15:8]}
-    : {load_buffer_q_sys[7:0], load_buffer_q_sys[15:8]};
+  wire [15:0] metadata_upload_word_sys = snapshot_valid_sys
+    ? expected_metadata_word_sys : 16'h0000;
+  assign nvram_din = metadata_nvram_address
+    ? {metadata_upload_word_sys[7:0], metadata_upload_word_sys[15:8]}
+    : snapshot_valid_sys
+      ? {save_buffer_q_sys[7:0], save_buffer_q_sys[15:8]}
+      : {load_buffer_q_sys[7:0], load_buffer_q_sys[15:8]};
   assign dirty_sys = dirty_sync_sys;
   assign active_sys = active_sync_sys;
 
