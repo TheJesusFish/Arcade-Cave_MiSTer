@@ -16,6 +16,25 @@ try {
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   & vsim -c -lib $work CaveHighScoreManager_tb -do 'run -all; quit -f'
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  & vlog -work $work -sv `
+    rtl/cave/CaveNvramUploadPrefetch.sv `
+    sim/highscore/CaveNvramUploadPrefetch_tb.sv
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  & vsim -c -lib $work CaveNvramUploadPrefetch_tb -do 'run -all; quit -f'
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  & vlog -work $work -sv `
+    rtl/cave/CaveSyncReadMem.sv `
+    rtl/cave/CaveNvramWriteBackCache.sv `
+    rtl/cave/CaveAsyncMemArbiters.sv `
+    rtl/cave/CaveNvramUploadPrefetch.sv `
+    sim/highscore/CaveNvramUploadIntegration_tb.sv
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  & vsim -c -lib $work CaveNvramUploadIntegration_tb -do 'run -all; quit -f'
   exit $LASTEXITCODE
 }
 finally {

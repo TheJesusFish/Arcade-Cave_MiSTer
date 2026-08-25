@@ -58,6 +58,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveGameConfig.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/highscore/CaveHighScoreManager.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveLayerProcessor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveMainSupport.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveNvramUploadPrefetch.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CaveOKIM6295.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CavePageFlippers.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cave/CavePwrInst2OkiRomCache.sv

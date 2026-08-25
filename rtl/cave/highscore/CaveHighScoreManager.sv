@@ -192,8 +192,10 @@ module CaveHighScoreManager (
     nvram_download && nvram_wr && metadata_nvram_address;
   wire load_buffer_wr_sys =
     nvram_download && nvram_wr && score_nvram_address;
+  // Main samples upload data before pulsing nvram_rd, so read ahead while the
+  // requested score word is selected.
   wire load_buffer_rd_sys =
-    nvram_upload && nvram_rd && score_nvram_address;
+    nvram_upload && score_nvram_address;
   wire [15:0] load_buffer_q_sys;
   wire [7:0]  load_buffer_q_cpu;
   wire [15:0] save_buffer_q_sys;

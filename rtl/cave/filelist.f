@@ -31,6 +31,7 @@ SDRAM.sv
 CaveBurstDMAs.sv
 CaveReadCache.sv
 CaveNvramWriteBackCache.sv
+CaveNvramUploadPrefetch.sv
 CaveAsyncMemArbiters.sv
 MemSys.sv
 VideoSys.sv

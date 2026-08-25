@@ -366,6 +366,45 @@ module CaveHighScoreManager_tb;
     repeat (5) @(posedge cpu_clock);
     cpu_reset = 1'b0;
 
+    // A missing .nvm means Main never performs an index-2 download. The first
+    // upload must still capture valid RAM without restoring or mutating it.
+    load_two_range_config();
+    write_signatures(1'b1);
+    @(negedge sys_clock);
+    nvram_upload = 1'b1;
+    @(posedge sys_clock);
+    #1;
+    check(!nvram_wait_n, "first upload without a download stalls for capture");
+    i = 0;
+    while (!nvram_wait_n && i < 2000) begin
+      @(posedge sys_clock);
+      i = i + 1;
+    end
+    check(nvram_wait_n, "first upload without a download completes capture");
+    upload_word_check(10'd128, 16'h4356);
+    upload_word_check(10'd130, 16'h4853);
+    upload_word_check(10'd132, 16'h0120);
+    upload_word_check(10'd160, 16'hA100);
+    upload_word_check(10'd162, 16'hA3B1);
+    upload_word_check(10'd164, 16'h0000);
+    upload_word_check(10'd166, 16'hB400);
+    check(read_work_byte(16'h0020) == 8'hA1,
+          "first upload leaves range 0 untouched");
+    check(read_work_byte(16'h0034) == 8'hB4,
+          "first upload leaves range 1 untouched");
+    @(negedge sys_clock);
+    nvram_upload = 1'b0;
+    repeat (4) @(posedge sys_clock);
+    check(!cpu_hold, "first upload releases the CPU hold");
+
+    // Return to the original power-on ordering for the remaining tests.
+    sys_reset = 1'b1;
+    cpu_reset = 1'b1;
+    repeat (5) @(posedge sys_clock);
+    sys_reset = 1'b0;
+    repeat (5) @(posedge cpu_clock);
+    cpu_reset = 1'b0;
+
     // Main sends MRA NVRAM before the later ROM index-4 descriptor. Buffer
     // the complete header and validate it only after both inputs exist.
     load_one_range_score_data();

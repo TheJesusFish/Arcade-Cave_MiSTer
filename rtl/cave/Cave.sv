@@ -692,19 +692,23 @@ module Cave(
     ioctl_download & ioctlNvramIndexSelected & ioctlNvramEepromAddress;
   wire         ioctlNvramHighScoreReadEnable =
     ioctl_upload & ioctlNvramIndexSelected & ~ioctlNvramEepromAddress;
-  wire         memSys_io_prog_nvram_readEnable =
-    ioctlNvramEepromReadEnable;
   wire         memSys_io_prog_nvram_writeEnable =
     ioctlNvramEepromWriteEnable;
+  wire [15:0]  ioctlNvramEepromDout;
+  wire         ioctlNvramEepromUploadWaitN;
+  wire         ioctlNvramEepromMemRd;
+  wire [6:0]   ioctlNvramEepromMemAddr;
   wire         ioctlNvramAccess =
     (ioctl_upload | ioctl_download) & ioctlNvramIndexSelected;
+  wire         ioctlNvramEepromWaitN = ioctl_upload
+    ? ioctlNvramEepromUploadWaitN
+    : _memSys_io_prog_nvram_wait_n;
   wire         ioctlNvramWaitN = _main_io_hs_nvram_wait_n &
-    (~ioctlNvramEepromAddress | _memSys_io_prog_nvram_wait_n);
+    (~ioctlNvramEepromAddress | ioctlNvramEepromWaitN);
   wire         ioctlMemoryWaitN =
     ioctlNvramAccess
       ? ioctlNvramWaitN
       : ~memSys_io_prog_rom_writeEnable | _memSys_io_prog_rom_wait_n;
-  reg  [15:0]  memSys_io_prog_nvram_ioctl_din_r;
   reg          memSysIoctlDownloadReg;
   wire         ioctlVideoIndexSelected = ioctl_index == 8'h3;
   wire         videoSys_io_prog_video_writeEnable =
@@ -805,8 +809,6 @@ module Cave(
     else if (optionGameIndexFallback | ioctlGameIndexWrite)
       gameIndexCpuLoadToggle <= ~gameIndexCpuLoadToggle;
     ioctlDownloadReg <= ioctl_download;
-    if (_memSys_io_prog_nvram_valid)
-      memSys_io_prog_nvram_ioctl_din_r <= _memSys_io_prog_nvram_dout;
     memSysIoctlDownloadReg <= ioctl_download;
     videoSysIoctlDownloadReg <= ioctl_download;
     if (reset) begin
@@ -825,6 +827,21 @@ module Cave(
       gameIndexReg_latched <=
         optionGameIndexFallback | ioctlGameIndexWrite | gameIndexReg_latched;
   end // always @(posedge)
+
+  CaveNvramUploadPrefetch nvramUploadPrefetch (
+    .clock         (clock),
+    .reset         (reset),
+    .upload        (ioctlNvramEepromReadEnable),
+    .upload_addr   (ioctl_addr),
+    .upload_dout   (ioctlNvramEepromDout),
+    .upload_wait_n (ioctlNvramEepromUploadWaitN),
+    .mem_rd        (ioctlNvramEepromMemRd),
+    .mem_addr      (ioctlNvramEepromMemAddr),
+    .mem_dout      (_memSys_io_prog_nvram_dout),
+    .mem_wait_n    (_memSys_io_prog_nvram_wait_n),
+    .mem_valid     (_memSys_io_prog_nvram_valid)
+  );
+
   assign dipsRegsWr =
     ioctl_download & ioctl_index == 8'hFE & ioctl_addr[26:3] == 24'h0 & ioctl_wr;
   assign dipsRegsAddr = ioctl_addr[2:1];
@@ -1062,11 +1079,13 @@ module Cave(
   );
   assign _memSys_io_prog_rom_wr = memSys_io_prog_rom_writeEnable & ioctl_wr;
   assign _memSys_io_prog_nvram_rd =
-    ssNvramRd | (memSys_io_prog_nvram_readEnable & ioctl_rd);
+    ssNvramRd | ioctlNvramEepromMemRd;
   assign _memSys_io_prog_nvram_wr =
     ssNvramWr | (memSys_io_prog_nvram_writeEnable & ioctl_wr);
   assign _memSys_io_prog_nvram_addr =
-    (ssNvramRd | ssNvramWr) ? {20'd0, ssNvramAddr} : ioctl_addr;
+    (ssNvramRd | ssNvramWr) ? {20'd0, ssNvramAddr} :
+    ioctlNvramEepromReadEnable ? {20'd0, ioctlNvramEepromMemAddr} :
+    ioctl_addr;
   assign _memSys_io_prog_nvram_din = ssNvramWr ? ssNvramDin : ioctl_dout;
   assign _memSys_io_prog_done =
     ~ioctl_download & memSysIoctlDownloadReg & ioctlRomIndexSelected;
@@ -1866,7 +1885,7 @@ module Cave(
   );
   assign ioctl_wait_n = videoSys_io_prog_video_writeEnable | ioctlMemoryWaitN;
   assign ioctl_din =
-    memSys_io_prog_nvram_readEnable ? memSys_io_prog_nvram_ioctl_din_r :
+    ioctlNvramEepromReadEnable ? ioctlNvramEepromDout :
     ioctlNvramHighScoreReadEnable ? _main_io_hs_nvram_din : 16'h0;
   assign nvram_dirty = eepromDirtyReg | _main_io_hs_dirty;
   assign led_power = 1'b0;
